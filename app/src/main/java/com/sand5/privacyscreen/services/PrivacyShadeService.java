@@ -49,19 +49,26 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static com.sand5.privacyscreen.utils.DisplayUtils.dpToPx;
-import static com.sand5.privacyscreen.utils.DisplayUtils.getStatusBarHeight;
 import static com.sand5.privacyscreen.utils.DisplayUtils.pxToDp;
 
 public class PrivacyShadeService extends Service {
 
     // TODO: 4/2/17 Enable pinch to zoom
+    // TODO: 4/7/17 Save preferences
+    // FIXME: 4/7/17 Flicker on pixel C on phone calls
+    // TODO: 4/7/17 Remove lag on dragging
+    // FIXME: 4/7/17 Start service only once from app drawer
+    // FIXME: 4/7/17 Change notification when launched from app drawer
+    // TODO: 4/7/17 Handle screen lock/unlock, call received use-cases
 
+    static final int REFRESH_RATE = 5;
     public static boolean isRunning = false;
     private final String TAG = "PrivacyShadeService";
     int circleViewMarginX;
     int circleViewMarginY;
     int circleViewDestinationX;
     int circleViewDestinationY;
+    int counter = 0;
     private int screenHeight;
     private int screenWidth;
     private WindowManager windowManager;
@@ -83,20 +90,23 @@ public class PrivacyShadeService extends Service {
     private int defaultRectangleHeight = dpToPx(100);
     private int defaultRectangleBorderWidth = 30;
     private int defaultShadeColor;
-    private int defaultOpacity = 50;
+    private float defaultOpacity;
     private WindowManager.LayoutParams privacyShadeParams;
     private boolean isTouchingBottomLine = false;
     private LinearLayout seekbarHolderLayout;
     private int maximumDefaultBrightness = 80;
     private Matrix matrix = new Matrix();
+    private boolean isTouchingTopLine = false;
     private BitmapDrawable bitmapDrawable;
     View.OnTouchListener bottomLineTouchListener = new View.OnTouchListener() {
 
         int numberOfFingers;
         int x_cord_Destination, y_cord_Destination;
 
+
         @Override
         public boolean onTouch(View v, MotionEvent event) {
+
             isTouchingBottomLine = true;
             numberOfFingers = event.getPointerCount();
             WindowManager.LayoutParams bottomLineLayoutParams = (WindowManager.LayoutParams) bottomLineView.getLayoutParams();
@@ -114,32 +124,103 @@ public class PrivacyShadeService extends Service {
                     break;
 
                 case MotionEvent.ACTION_MOVE:
+                    counter += 1;
+                    if ((REFRESH_RATE % counter) == 0) {
+                        int x_diff_move = x_cord - x_init_cord;
+                        int y_diff_move = y_cord - y_init_cord;
+
+                        x_cord_Destination = x_init_margin + x_diff_move;
+                        y_cord_Destination = y_init_margin + y_diff_move;
+
+                        bottomLineLayoutParams.x = x_cord_Destination;
+                        bottomLineLayoutParams.y = y_cord_Destination;
+
+                        topLineLayoutParams.x = x_cord_Destination;
+                        topLineLayoutParams.y = y_cord_Destination - defaultRectangleHeight;
+
+                        windowManager.updateViewLayout(bottomLineView, bottomLineLayoutParams);
+                        windowManager.updateViewLayout(topLineView, topLineLayoutParams);
+
+                        bottomLineView.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                int[] bottomLineLocation = new int[2];
+                                int[] topLineLocation = new int[2];
+                                bottomLineView.getLocationOnScreen(bottomLineLocation);
+                                int x = bottomLineLocation[0];
+                                int bottomLineY = bottomLineLocation[1];
+                                Logger.d("Bottom Line Y: " + bottomLineY);
+                                topLineView.getLocationOnScreen(topLineLocation);
+                                int topLineY = topLineLocation[1];
+                                Logger.d("Top Line Y: " + topLineY);
+
+                                resetBitmapColor();
+                                privacyShadeCanvas.drawRect(0, topLineY + defaultRectangleBorderWidth / 2, screenWidth, bottomLineY + defaultRectangleBorderWidth / 2, transparentPaint);
+                                bitmapDrawable = new BitmapDrawable(privacyShadeBitmap);
+                                privacyShadeView.setBackground(bitmapDrawable);
+                            }
+                        });
+                    }
+                    counter = 0;
+                    break;
+                case MotionEvent.ACTION_UP:
+                    break;
+                default:
+                    break;
+            }
+            return true;
+        }
+    };
+    View.OnTouchListener topLineTouchListener = new View.OnTouchListener() {
+
+        int numberOfFingers;
+        int x_cord_Destination, y_cord_Destination;
+
+        @Override
+        public boolean onTouch(View v, MotionEvent event) {
+            isTouchingTopLine = true;
+            numberOfFingers = event.getPointerCount();
+            WindowManager.LayoutParams bottomLineLayoutParams = (WindowManager.LayoutParams) bottomLineView.getLayoutParams();
+            WindowManager.LayoutParams topLineLayoutParams = (WindowManager.LayoutParams) topLineView.getLayoutParams();
+            int x_cord = (int) event.getRawX();
+            int y_cord = (int) event.getRawY();
+
+            switch (event.getAction() & MotionEvent.ACTION_MASK) {
+
+                case MotionEvent.ACTION_DOWN:
+                    x_init_cord = x_cord;
+                    y_init_cord = y_cord;
+                    x_init_margin = topLineLayoutParams.x;
+                    y_init_margin = topLineLayoutParams.y;
+                    break;
+
+                case MotionEvent.ACTION_MOVE:
                     int x_diff_move = x_cord - x_init_cord;
                     int y_diff_move = y_cord - y_init_cord;
 
                     x_cord_Destination = x_init_margin + x_diff_move;
                     y_cord_Destination = y_init_margin + y_diff_move;
 
-                    bottomLineLayoutParams.x = x_cord_Destination;
-                    bottomLineLayoutParams.y = y_cord_Destination;
-
                     topLineLayoutParams.x = x_cord_Destination;
-                    topLineLayoutParams.y = y_cord_Destination - defaultRectangleHeight;
+                    topLineLayoutParams.y = y_cord_Destination;
 
-                    windowManager.updateViewLayout(bottomLineView, bottomLineLayoutParams);
+                    bottomLineLayoutParams.x = x_cord_Destination;
+                    bottomLineLayoutParams.y = y_cord_Destination + defaultRectangleHeight;
+
                     windowManager.updateViewLayout(topLineView, topLineLayoutParams);
+                    windowManager.updateViewLayout(bottomLineView, bottomLineLayoutParams);
 
-                    bottomLineView.post(new Runnable() {
+                    topLineView.post(new Runnable() {
                         @Override
                         public void run() {
                             int[] bottomLineLocation = new int[2];
                             int[] topLineLocation = new int[2];
-                            bottomLineView.getLocationOnScreen(bottomLineLocation);
-                            int x = bottomLineLocation[0];
-                            int bottomLineY = bottomLineLocation[1];
-                            Logger.d("Bottom Line Y: " + bottomLineY);
                             topLineView.getLocationOnScreen(topLineLocation);
+                            int x = topLineLocation[0];
                             int topLineY = topLineLocation[1];
+                            Logger.d("Bottom Line Y: " + topLineY);
+                            bottomLineView.getLocationOnScreen(bottomLineLocation);
+                            int bottomLineY = bottomLineLocation[1];
                             Logger.d("Top Line Y: " + topLineY);
 
                             resetBitmapColor();
@@ -231,74 +312,7 @@ public class PrivacyShadeService extends Service {
             return true;
         }
     };
-    private boolean isTouchingTopLine = false;
-    View.OnTouchListener topLineTouchListener = new View.OnTouchListener() {
-
-        int numberOfFingers;
-        int x_cord_Destination, y_cord_Destination;
-
-        @Override
-        public boolean onTouch(View v, MotionEvent event) {
-            isTouchingTopLine = true;
-            numberOfFingers = event.getPointerCount();
-            WindowManager.LayoutParams bottomLineLayoutParams = (WindowManager.LayoutParams) bottomLineView.getLayoutParams();
-            WindowManager.LayoutParams topLineLayoutParams = (WindowManager.LayoutParams) topLineView.getLayoutParams();
-            int x_cord = (int) event.getRawX();
-            int y_cord = (int) event.getRawY();
-
-            switch (event.getAction() & MotionEvent.ACTION_MASK) {
-
-                case MotionEvent.ACTION_DOWN:
-                    x_init_cord = x_cord;
-                    y_init_cord = y_cord;
-                    x_init_margin = topLineLayoutParams.x;
-                    y_init_margin = topLineLayoutParams.y;
-                    break;
-
-                case MotionEvent.ACTION_MOVE:
-                    int x_diff_move = x_cord - x_init_cord;
-                    int y_diff_move = y_cord - y_init_cord;
-
-                    x_cord_Destination = x_init_margin + x_diff_move;
-                    y_cord_Destination = y_init_margin + y_diff_move;
-
-                    topLineLayoutParams.x = x_cord_Destination;
-                    topLineLayoutParams.y = y_cord_Destination;
-
-                    bottomLineLayoutParams.x = x_cord_Destination;
-                    bottomLineLayoutParams.y = y_cord_Destination + defaultRectangleHeight;
-
-                    windowManager.updateViewLayout(topLineView, topLineLayoutParams);
-                    windowManager.updateViewLayout(bottomLineView, bottomLineLayoutParams);
-
-                    topLineView.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            int[] bottomLineLocation = new int[2];
-                            int[] topLineLocation = new int[2];
-                            topLineView.getLocationOnScreen(topLineLocation);
-                            int x = topLineLocation[0];
-                            int topLineY = topLineLocation[1];
-                            Logger.d("Bottom Line Y: " + topLineY);
-                            bottomLineView.getLocationOnScreen(bottomLineLocation);
-                            int bottomLineY = bottomLineLocation[1];
-                            Logger.d("Top Line Y: " + topLineY);
-
-                            resetBitmapColor();
-                            privacyShadeCanvas.drawRect(0, topLineY + defaultRectangleBorderWidth / 2, screenWidth, bottomLineY + defaultRectangleBorderWidth / 2, transparentPaint);
-                            bitmapDrawable = new BitmapDrawable(privacyShadeBitmap);
-                            privacyShadeView.setBackground(bitmapDrawable);
-                        }
-                    });
-                    break;
-                case MotionEvent.ACTION_UP:
-                    break;
-                default:
-                    break;
-            }
-            return true;
-        }
-    };
+    private ShapeType shapeType;
 
     @SuppressWarnings("deprecation")
     @Override
@@ -319,11 +333,11 @@ public class PrivacyShadeService extends Service {
         screenHeight = displayMetrics.heightPixels;
         screenWidth = displayMetrics.widthPixels;
         defaultShadeColor = ContextCompat.getColor(getApplicationContext(), R.color.black);
-
+        setDefaultOpacity(0.5f);
         createDefaultPrivacyShade();
         addPrivacyShade();
-        addTransparentCircle();
-        //addTransparentRectangle();
+        //addTransparentCircle();
+        addTransparentRectangle();
         addPrivacyShadeMenu();
     }
 
@@ -343,45 +357,26 @@ public class PrivacyShadeService extends Service {
         privacyShadeCanvas.drawBitmap(privacyShadeBitmap, matrix, null);
     }
 
-    private void reset(Shapes shapes) {
+    private void addPrivacyShade() {
+        privacyShadeView = (RelativeLayout) inflater.inflate(R.layout.layout_privacy_screen, null);
+        szWindow.set(screenWidth, screenHeight);
 
-        if (privacyShadeView != null) {
-            windowManager.removeView(privacyShadeView);
-        }
-
-        if (circleView != null) {
-            windowManager.removeView(circleView);
-            circleView = null;
-        }
-
-        if (circlePullView != null) {
-            windowManager.removeView(circlePullView);
-            circlePullView = null;
-        }
-
-        if (bottomLineView != null) {
-            windowManager.removeView(bottomLineView);
-            bottomLineView = null;
-        }
-
-        if (topLineView != null) {
-            windowManager.removeView(topLineView);
-            topLineView = null;
-        }
-
-        createDefaultPrivacyShade();
-        addPrivacyShade();
-        switch (shapes) {
-            case CIRCLE:
-                addTransparentCircle();
-                break;
-            case RECTANGLE:
-                addTransparentRectangle();
-                break;
-        }
+		/*
+        Underlying touches are supported by TYPE_SYSTEM_OVERLAY and not by TYPE_PHONE
+		 */
+        privacyShadeParams = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT);
+        privacyShadeParams.gravity = Gravity.TOP | Gravity.START;
+        privacyShadeParams.alpha = getDefaultOpacity();
+        windowManager.addView(privacyShadeView, privacyShadeParams);
     }
 
     private void addTransparentRectangle() {
+        setShapeType(ShapeType.RECTANGLE);
         /*
         Punch a transparent rectangle into the privacy shade
          */
@@ -392,12 +387,11 @@ public class PrivacyShadeService extends Service {
         int left = transparentRect.left;
         int bottom = transparentRect.bottom;
         int right = transparentRect.right;
-        Logger.d("Transparent Rectangle Top: " + top);
+
+        /*Logger.d("Transparent Rectangle Top: " + top);
         Logger.d("Transparent Rectangle Left: " + left);
         Logger.d("Transparent Rectangle Bottom: " + bottom);
-        Logger.d("Transparent Rectangle Right: " + right);
-
-
+        Logger.d("Transparent Rectangle Right: " + right);*/
 
         /*
         Add bottom line to the transparent rectangle
@@ -412,11 +406,10 @@ public class PrivacyShadeService extends Service {
                 PixelFormat.TRANSLUCENT);
         bottomLineParams.gravity = Gravity.TOP | Gravity.START;
         bottomLineParams.x = 0;
-        Logger.d("Status Bar height: " + getStatusBarHeight(getApplicationContext()));
+        //Logger.d("Status Bar height: " + getStatusBarHeight(getApplicationContext()));
         bottomLineParams.y = bottom - defaultRectangleBorderWidth / 2;
         windowManager.addView(bottomLineView, bottomLineParams);
-
-
+        bottomLineView.setOnTouchListener(bottomLineTouchListener);
 
         /*bottomLineView.post(new Runnable() {
             @Override
@@ -438,8 +431,6 @@ public class PrivacyShadeService extends Service {
             }
         });*/
 
-        bottomLineView.setOnTouchListener(bottomLineTouchListener);
-
         /*
         Add topline view over transparent rectangle
          */
@@ -453,34 +444,15 @@ public class PrivacyShadeService extends Service {
         topLineParams.gravity = Gravity.TOP | Gravity.START;
         topLineParams.x = 0;
         topLineParams.y = top - defaultRectangleBorderWidth / 2;
-        topLineView.setLayoutParams(topLineParams);
+        windowManager.addView(topLineView, topLineParams);
+        topLineView.setOnTouchListener(topLineTouchListener);
+
         /*topLineView.post(new Runnable() {
             @Override
             public void run() {
                 //Logger.d("Line Padding top: " + topLineView.getY());
             }
         });*/
-
-        windowManager.addView(topLineView, topLineParams);
-        topLineView.setOnTouchListener(topLineTouchListener);
-    }
-
-    private void addPrivacyShade() {
-        privacyShadeView = (RelativeLayout) inflater.inflate(R.layout.layout_privacy_screen, null);
-        szWindow.set(screenWidth, screenHeight);
-
-		/*
-        Underlying touches are supported by TYPE_SYSTEM_OVERLAY and not by TYPE_PHONE
-		 */
-        privacyShadeParams = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                PixelFormat.TRANSLUCENT);
-        privacyShadeParams.gravity = Gravity.TOP | Gravity.START;
-        privacyShadeParams.alpha = defaultOpacity;
-        windowManager.addView(privacyShadeView, privacyShadeParams);
     }
 
     private void addPrivacyShadeMenu() {
@@ -494,9 +466,9 @@ public class PrivacyShadeService extends Service {
         menuParams.gravity = Gravity.TOP | Gravity.END;
 
         ImageButton removeShadeButton = (ImageButton) menuView.findViewById(R.id.button_close_privacy_screen);
-        ImageButton toggleCircleButton = (ImageButton) menuView.findViewById(R.id.toggle_circle_imageButton);
+        final ImageButton toggleCircleButton = (ImageButton) menuView.findViewById(R.id.toggle_circle_imageButton);
         ImageButton toggleRectangleButton = (ImageButton) menuView.findViewById(R.id.toggle_rectangle_imageButton);
-        ImageButton toggleBrightnessSeekbarButton = (ImageButton) menuView.findViewById(R.id.toggle_brightness_imageButton);
+        ImageButton toggleBrightnessSeekBarButton = (ImageButton) menuView.findViewById(R.id.toggle_brightness_imageButton);
 
         removeShadeButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -506,7 +478,7 @@ public class PrivacyShadeService extends Service {
         });
 
 
-        toggleBrightnessSeekbarButton.setOnClickListener(new VisibleToggleClickListener() {
+        toggleBrightnessSeekBarButton.setOnClickListener(new VisibleToggleClickListener() {
             @Override
             protected void changeVisibility(boolean visible) {
                 Transition fadeTransition = new Fade();
@@ -521,14 +493,23 @@ public class PrivacyShadeService extends Service {
         toggleCircleButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                reset(Shapes.CIRCLE);
+                switch (getShapeType()) {
+                    case CIRCLE:
+                        changeShape(ShapeType.RECTANGLE);
+                        toggleCircleButton.setImageResource(R.drawable.ic_crop_5_4_white_24dp);
+                        break;
+                    case RECTANGLE:
+                        changeShape(ShapeType.CIRCLE);
+                        toggleCircleButton.setImageResource(R.drawable.ic_panorama_fish_eye_white_24dp);
+                        break;
+                }
             }
         });
 
         toggleRectangleButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                reset(Shapes.RECTANGLE);
+
             }
         });
 
@@ -542,6 +523,7 @@ public class PrivacyShadeService extends Service {
     }
 
     private void addTransparentCircle() {
+        setShapeType(ShapeType.CIRCLE);
         circleView = (RelativeLayout) inflater.inflate(R.layout.layout_circle, null);
         WindowManager.LayoutParams circleViewParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
@@ -567,11 +549,10 @@ public class PrivacyShadeService extends Service {
         circleImageView.post(new Runnable() {
             @Override
             public void run() {
-
-                Log.d(TAG, "Circle Height:" + circleImageView.getHeight());
+                /*Log.d(TAG, "Circle Height:" + circleImageView.getHeight());
                 Log.d(TAG, "Circle Width:" + circleImageView.getWidth());
                 Log.d(TAG, "Circle Height DP:" + pxToDp(circleImageView.getHeight()));
-                Log.d(TAG, "Circle Width DP:" + pxToDp(circleImageView.getWidth()));
+                Log.d(TAG, "Circle Width DP:" + pxToDp(circleImageView.getWidth()));*/
                 /*
                 Punch a transparent circle into the privacy shade
                 */
@@ -603,14 +584,14 @@ public class PrivacyShadeService extends Service {
         /*circlePullView.post(new Runnable() {
             @Override
             public void run() {
-
                 Log.d(TAG, "Circle Parent Height:" + circlePullView.getHeight());
                 Log.d(TAG, "Circle Parent Width:" + circlePullView.getWidth());
                 Log.d(TAG, "Circle Parent Height DP:" + pxToDp(circlePullView.getHeight()));
                 Log.d(TAG, "Circle Parent Width DP:" + pxToDp(circlePullView.getWidth()));
-
             }
         });*/
+
+
         ImageView circlePullImageView = (ImageView) circlePullView.findViewById(R.id.circle_pull_imageView);
         circlePullImageView.setOnTouchListener(circleEyeTouchListener);
         windowManager.addView(circlePullView, circlePullViewParams);
@@ -619,7 +600,6 @@ public class PrivacyShadeService extends Service {
     private void addOpacitySeekBar() {
         brightnessSeekBarView = (RelativeLayout) inflater.inflate(R.layout.layout_brightness_seekbar, null);
         seekbarHolderLayout = (LinearLayout) brightnessSeekBarView.findViewById(R.id.brightness_seekbar_holder);
-        //brightnessSeekBarView.setPadding(72,0,72,0);
         WindowManager.LayoutParams seekBarParams = new WindowManager.LayoutParams(
                 screenWidth - dpToPx(56),
                 dpToPx(56),
@@ -631,12 +611,17 @@ public class PrivacyShadeService extends Service {
 
         SeekBar brightnessSeekBar = (SeekBar) brightnessSeekBarView.findViewById(R.id.brightness_seekbar);
         brightnessSeekBar.setMax(maximumDefaultBrightness);
-        brightnessSeekBar.setProgress(defaultOpacity);
+
+        int progressBar = Math.round(getDefaultOpacity() * 100);
+
+        brightnessSeekBar.setProgress(progressBar
+        );
         brightnessSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                setDefaultOpacity((float) (100 - progress) / 100);
                 float opacity = (float) (100 - progress) / 100;
-                Logger.d("On Progress Changed: " + opacity);
+                //Logger.d("On Progress Changed: " + opacity);
                 privacyShadeParams.alpha = opacity;
                 windowManager.updateViewLayout(privacyShadeView, privacyShadeParams);
             }
@@ -652,6 +637,48 @@ public class PrivacyShadeService extends Service {
             }
         });
         windowManager.addView(brightnessSeekBarView, seekBarParams);
+    }
+
+    private void changeShape(ShapeType shapeType) {
+
+        if (privacyShadeView != null) {
+            windowManager.removeView(privacyShadeView);
+        }
+
+        if (circleView != null) {
+            windowManager.removeView(circleView);
+            circleView = null;
+        }
+
+        if (circlePullView != null) {
+            windowManager.removeView(circlePullView);
+            circlePullView = null;
+        }
+
+        if (bottomLineView != null) {
+            windowManager.removeView(bottomLineView);
+            bottomLineView = null;
+        }
+
+        if (topLineView != null) {
+            windowManager.removeView(topLineView);
+            topLineView = null;
+        }
+
+        createDefaultPrivacyShade();
+        addPrivacyShade();
+        switch (shapeType) {
+            case CIRCLE:
+                addTransparentCircle();
+                break;
+            case RECTANGLE:
+                addTransparentRectangle();
+                break;
+        }
+    }
+
+    private void resetBitmapColor() {
+        privacyShadeBitmap.eraseColor(ContextCompat.getColor(getApplicationContext(), R.color.black));
     }
 
     @Override
@@ -691,7 +718,6 @@ public class PrivacyShadeService extends Service {
         Notification notification = new NotificationCompat.Builder(this)
                 .setContentTitle(getResources().getString(R.string.app_name) + " " + getResources().getString(R.string.notification_joiner_shade_is_on))
                 .setContentText(getResources().getString(R.string.notification_turn_off_shade))
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setSmallIcon(android.R.color.transparent)
                 .setContentIntent(stopServicePendingIntent)
                 .setOngoing(true)
@@ -728,15 +754,15 @@ public class PrivacyShadeService extends Service {
             windowManager.removeView(brightnessSeekBarView);
         }
 
+        if (circlePullView != null) {
+            windowManager.removeView(circlePullView);
+        }
+
         Logger.d("PrivacyShadeService.onStop, starting notification service");
         Intent startServiceIntent = new Intent(Constants.STARTFOREGROUND_ACTION);
         startServiceIntent.setClass(this, PersistentNotificationService.class);
         startServiceIntent.setAction(Constants.STARTFOREGROUND_ACTION);
         startService(startServiceIntent);
-    }
-
-    private void resetBitmapColor() {
-        privacyShadeBitmap.eraseColor(ContextCompat.getColor(getApplicationContext(), R.color.black));
     }
 
     @Override
@@ -745,7 +771,23 @@ public class PrivacyShadeService extends Service {
         return null;
     }
 
-    private enum Shapes {RECTANGLE, CIRCLE}
+    public ShapeType getShapeType() {
+        return shapeType;
+    }
+
+    public void setShapeType(ShapeType shapeType) {
+        this.shapeType = shapeType;
+    }
+
+    public float getDefaultOpacity() {
+        return defaultOpacity;
+    }
+
+    public void setDefaultOpacity(float defaultOpacity) {
+        this.defaultOpacity = defaultOpacity;
+    }
+
+    private enum ShapeType {RECTANGLE, CIRCLE}
 
     public class TimerIncreasedRunnable implements Runnable {
         private SharedPreferences currentSharedPreferences;
