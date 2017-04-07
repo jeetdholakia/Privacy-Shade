@@ -1,51 +1,79 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/menu_privacyShade_linearLayout"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-
     android:orientation="vertical">
 
-    <ImageButton
-        android:id="@+id/button_close_privacy_screen"
+    <com.andexert.library.RippleView
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:paddingBottom="32dp"
+        android:layout_height="56dp"
         android:paddingEnd="16dp"
         android:paddingStart="16dp"
-        android:paddingTop="32dp"
-        android:src="@drawable/ic_exit_to_app_white_24dp" />
+        app:rv_centered="true"
+        app:rv_rippleDuration="400">
 
-    <ImageButton
-        android:id="@+id/toggle_circle_imageButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
-        android:paddingBottom="32dp"
-        android:paddingEnd="16dp"
-        android:paddingStart="16dp"
-        android:src="@drawable/ic_panorama_fish_eye_white_24dp" />
+        <ImageButton
+            android:id="@+id/button_close_privacy_screen"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_exit_to_app_white_24dp" />
+    </com.andexert.library.RippleView>
 
-    <ImageButton
-        android:id="@+id/toggle_rectangle_imageButton"
+    <com.andexert.library.RippleView
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
-        android:paddingBottom="32dp"
+        android:layout_height="56dp"
         android:paddingEnd="16dp"
         android:paddingStart="16dp"
-        android:src="@drawable/ic_crop_5_4_white_24dp" />
+        app:rv_centered="true"
+        app:rv_rippleDuration="400">
 
-    <ImageButton
-        android:id="@+id/toggle_brightness_imageButton"
+        <ImageButton
+            android:id="@+id/toggle_circle_imageButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:background="@android:color/transparent"
+            android:src="@drawable/ic_panorama_fish_eye_white_24dp" />
+    </com.andexert.library.RippleView>
+
+
+    <com.andexert.library.RippleView
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="?android:attr/selectableItemBackground"
-        android:paddingBottom="32dp"
+        android:layout_height="56dp"
         android:paddingEnd="16dp"
         android:paddingStart="16dp"
-        android:src="@drawable/ic_settings_brightness_white_24dp" />
+        app:rv_centered="true"
+        app:rv_rippleDuration="400">
+
+        <ImageButton
+            android:id="@+id/toggle_rectangle_imageButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:background="@android:color/transparent"
+            android:src="@drawable/ic_crop_5_4_white_24dp" />
+    </com.andexert.library.RippleView>
+
+    <com.andexert.library.RippleView
+        android:layout_width="wrap_content"
+        android:layout_height="56dp"
+        android:paddingEnd="16dp"
+        android:paddingStart="16dp"
+        app:rv_centered="true"
+        app:rv_rippleDuration="400">
+
+        <ImageButton
+            android:id="@+id/toggle_brightness_imageButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:background="@android:color/transparent"
+            android:src="@drawable/ic_settings_brightness_white_24dp" />
+    </com.andexert.library.RippleView>
 
 
 </LinearLayout>

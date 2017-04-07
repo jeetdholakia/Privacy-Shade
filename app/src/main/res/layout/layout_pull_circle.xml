@@ -4,9 +4,9 @@
     android:layout_height="wrap_content">
 
     <ImageView
-        android:id="@+id/transparent_circle_imageView"
-        android:layout_width="150dp"
-        android:layout_height="150dp"
-        android:background="@drawable/circle" />
-
+        android:id="@+id/circle_pull_imageView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="32dp"
+        android:src="@drawable/ic_visibility_white_24dp" />
 </RelativeLayout>
