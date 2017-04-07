@@ -1,10 +1,12 @@
 package com.sand5.privacyscreen.services;
 
 
+import android.app.Notification;
+import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
-import android.content.res.Configuration;
-import android.content.res.Resources;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -14,90 +16,241 @@ import android.graphics.PixelFormat;
 import android.graphics.Point;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
-import android.os.Build;
-import android.os.Bundle;
-import android.os.CountDownTimer;
-import android.os.Handler;
 import android.os.IBinder;
+import android.support.v7.app.NotificationCompat;
 import android.util.DisplayMetrics;
 import android.util.Log;
-import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
-import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.SeekBar;
-import android.widget.TextView;
 
+import com.orhanobut.logger.Logger;
 import com.sand5.privacyscreen.R;
-import com.sand5.privacyscreen.utils.MyDialog;
-import com.sand5.privacyscreen.utils.Utils;
+import com.sand5.privacyscreen.utils.Constants;
+import com.sand5.privacyscreen.utils.ServiceBootstrap;
+
+import java.util.ArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import static com.sand5.privacyscreen.utils.DisplayUtils.dpToPx;
+import static com.sand5.privacyscreen.utils.DisplayUtils.getScreenCenterCoordinates;
+import static com.sand5.privacyscreen.utils.DisplayUtils.getStatusBarHeight;
+import static com.sand5.privacyscreen.utils.DisplayUtils.pxToDp;
 
 public class PrivacyShadeService extends Service {
-    private final String TAG = "PrivacyShadeService";
-    int screenHeight, screenWidth;
-    Handler myHandler = new Handler();
-    private WindowManager windowManager;
-    private RelativeLayout privacyShadeView, seekBarView;
-    private LinearLayout menuView;
-    private LinearLayout txtView, txt_linearlayout;
-    Runnable myRunnable = new Runnable() {
 
-        @Override
-        public void run() {
-            // TODO Auto-generated method stub
-            if (txtView != null) {
-                txtView.setVisibility(View.GONE);
-            }
-        }
-    };
+    // TODO: 4/2/17 Enable pinch to zoom
+
+    public static boolean isRunning = false;
+    private final String TAG = "PrivacyShadeService";
+    int[] bottomLineCoordinates = new int[2];
+    int bottomLineCoordinateX;
+    int bottomLineCoordinateY;
+    private int screenHeight;
+    private int screenWidth;
+    private WindowManager windowManager;
+    private RelativeLayout privacyShadeView;
+    private RelativeLayout brightnessSeekBarView;
+    private LinearLayout menuView;
     private ImageButton removeShadeButton;
     private ImageButton toggleCircleButton;
     private ImageButton toggleRectangleButton;
     private ImageButton toggleOpacityButton;
-    private TextView txt1;
     private int x_init_cord, y_init_cord, x_init_margin, y_init_margin;
     private Point szWindow = new Point();
-    private boolean isLeft = true;
-    private String sMsg = "";
-    private Button stopPrivacyScreen;
     private LayoutInflater inflater;
     private DisplayMetrics displayMetrics;
-    private RelativeLayout circleView, rectangleView;
-    private ImageView circleImageView, rectangleImageView;
+    private RelativeLayout circleView;
+    private ImageView circleImageView;
     private Canvas privacyShadeCanvas;
     private Bitmap privacyShadeBitmap;
     private Paint transparentPaint;
-    private SeekBar opacitySeekBar;
-    private int[] rectangleLocationCoordinates = new int[2];
-    private int rectangleX;
-    private int rectangleY;
-    private ScaleGestureDetector scaleGestureDetector;
-    private Matrix matrix = new Matrix();
+    private SeekBar brightnessSeekBar;
+    private SharedPreferences preferences;
+    private Rect transparentRect;
+    private RelativeLayout bottomLineView;
+    private RelativeLayout topLineView;
+    private int defaultRectangleHeight = 300;
+    private int defaultRectangleTop = 0;
+    private int defaultRectangleLeft;
+    private int defaultRectangleBottom = 0;
+    private int defaultRectangleRight;
+    private int defaultRectangleBorderWidth = 30;
+    private int defaultShadeColor;
+    private int defaultOpacity = 50;
+    private WindowManager.LayoutParams privacyShadeParams;
+    private boolean isTouchingBottomLine = false;
+    View.OnTouchListener bottomLineTouchListener = new View.OnTouchListener() {
 
-    public static float pxToDp(int px) {
-        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_PX, px, Resources.getSystem().getDisplayMetrics());
-    }
+        int numberOfFingers;
+        int x_cord_Destination, y_cord_Destination;
 
-    public static int dpToPx(int dp) {
-        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, Resources.getSystem().getDisplayMetrics());
-    }
+        @Override
+        public boolean onTouch(View v, MotionEvent event) {
+            isTouchingBottomLine = true;
+            numberOfFingers = event.getPointerCount();
+            WindowManager.LayoutParams bottomLineLayoutParams = (WindowManager.LayoutParams) bottomLineView.getLayoutParams();
+            WindowManager.LayoutParams topLineLayoutParams = (WindowManager.LayoutParams) topLineView.getLayoutParams();
+            int x_cord = (int) event.getRawX();
+            int y_cord = (int) event.getRawY();
+
+            switch (event.getAction() & MotionEvent.ACTION_MASK) {
+
+                case MotionEvent.ACTION_DOWN:
+                    x_init_cord = x_cord;
+                    y_init_cord = y_cord;
+                    x_init_margin = bottomLineLayoutParams.x;
+                    y_init_margin = bottomLineLayoutParams.y;
+                    break;
+
+                case MotionEvent.ACTION_MOVE:
+                    int x_diff_move = x_cord - x_init_cord;
+                    int y_diff_move = y_cord - y_init_cord;
+
+                    x_cord_Destination = x_init_margin + x_diff_move;
+                    y_cord_Destination = y_init_margin + y_diff_move;
+
+                    bottomLineLayoutParams.x = x_cord_Destination;
+                    bottomLineLayoutParams.y = y_cord_Destination;
+
+                    topLineLayoutParams.x = x_cord_Destination;
+                    topLineLayoutParams.y = y_cord_Destination - defaultRectangleHeight;
+
+                    windowManager.updateViewLayout(bottomLineView, bottomLineLayoutParams);
+                    windowManager.updateViewLayout(topLineView, topLineLayoutParams);
+
+                    topLineView.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            int[] bottomLineLocation = new int[2];
+                            int[] topLineLocation = new int[2];
+                            bottomLineView.getLocationOnScreen(bottomLineLocation);
+                            int x = bottomLineLocation[0];
+                            int bottomLineY = bottomLineLocation[1];
+                            Logger.d("Bottom Line Y: " + bottomLineY);
+                            topLineView.getLocationOnScreen(topLineLocation);
+                            int topLineY = topLineLocation[1];
+                            Logger.d("Top Line Y: " + topLineY);
+                            privacyShadeCanvas = null;
+                            privacyShadeBitmap = null;
+                            transparentPaint = null;
+                            privacyShadeBitmap = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.ARGB_8888);
+                            privacyShadeBitmap.eraseColor(getResources().getColor(R.color.black));
+                            privacyShadeCanvas = new Canvas(privacyShadeBitmap);
+                            privacyShadeCanvas.drawBitmap(privacyShadeBitmap, new Matrix(), null);
+                            transparentPaint = new Paint();
+                            transparentPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC));
+                            transparentPaint.setColor(Color.TRANSPARENT);
+                            transparentPaint.setAntiAlias(true);
+                            privacyShadeCanvas.drawRect(0, topLineY + defaultRectangleBorderWidth / 2, 1080, bottomLineY + defaultRectangleBorderWidth / 2, transparentPaint);
+                            BitmapDrawable bitmapDrawable = new BitmapDrawable(privacyShadeBitmap);
+                            privacyShadeView.setBackground(bitmapDrawable);
+                        }
+                    });
+                    break;
+                case MotionEvent.ACTION_UP:
+                    break;
+                default:
+                    break;
+            }
+            return true;
+        }
+    };
+    private boolean isTouchingTopLine = false;
+    View.OnTouchListener topLineTouchListener = new View.OnTouchListener() {
+
+        int numberOfFingers;
+        int x_cord_Destination, y_cord_Destination;
+
+        @Override
+        public boolean onTouch(View v, MotionEvent event) {
+            isTouchingTopLine = true;
+            numberOfFingers = event.getPointerCount();
+            WindowManager.LayoutParams bottomLineLayoutParams = (WindowManager.LayoutParams) bottomLineView.getLayoutParams();
+            WindowManager.LayoutParams topLineLayoutParams = (WindowManager.LayoutParams) topLineView.getLayoutParams();
+            int x_cord = (int) event.getRawX();
+            int y_cord = (int) event.getRawY();
+
+            switch (event.getAction() & MotionEvent.ACTION_MASK) {
+
+                case MotionEvent.ACTION_DOWN:
+                    x_init_cord = x_cord;
+                    y_init_cord = y_cord;
+                    x_init_margin = topLineLayoutParams.x;
+                    y_init_margin = topLineLayoutParams.y;
+                    break;
+
+                case MotionEvent.ACTION_MOVE:
+                    int x_diff_move = x_cord - x_init_cord;
+                    int y_diff_move = y_cord - y_init_cord;
+
+                    x_cord_Destination = x_init_margin + x_diff_move;
+                    y_cord_Destination = y_init_margin + y_diff_move;
+
+                    topLineLayoutParams.x = x_cord_Destination;
+                    topLineLayoutParams.y = y_cord_Destination;
+
+                    bottomLineLayoutParams.x = x_cord_Destination;
+                    bottomLineLayoutParams.y = y_cord_Destination + defaultRectangleHeight;
+
+                    windowManager.updateViewLayout(topLineView, topLineLayoutParams);
+                    windowManager.updateViewLayout(bottomLineView, bottomLineLayoutParams);
+
+                    topLineView.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            int[] bottomLineLocation = new int[2];
+                            int[] topLineLocation = new int[2];
+                            topLineView.getLocationOnScreen(topLineLocation);
+                            int x = topLineLocation[0];
+                            int topLineY = topLineLocation[1];
+                            Logger.d("Bottom Line Y: " + topLineY);
+                            bottomLineView.getLocationOnScreen(bottomLineLocation);
+                            int bottomLineY = bottomLineLocation[1];
+                            Logger.d("Top Line Y: " + topLineY);
+                            privacyShadeCanvas = null;
+                            privacyShadeBitmap = null;
+                            transparentPaint = null;
+                            privacyShadeBitmap = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.ARGB_8888);
+                            privacyShadeBitmap.eraseColor(getResources().getColor(R.color.black));
+                            privacyShadeCanvas = new Canvas(privacyShadeBitmap);
+                            privacyShadeCanvas.drawBitmap(privacyShadeBitmap, new Matrix(), null);
+                            transparentPaint = new Paint();
+                            transparentPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC));
+                            transparentPaint.setColor(Color.TRANSPARENT);
+                            transparentPaint.setAntiAlias(true);
+                            privacyShadeCanvas.drawRect(0, topLineY + defaultRectangleBorderWidth / 2, 1080, bottomLineY + defaultRectangleBorderWidth / 2, transparentPaint);
+                            BitmapDrawable bitmapDrawable = new BitmapDrawable(privacyShadeBitmap);
+                            privacyShadeView.setBackground(bitmapDrawable);
+                        }
+                    });
+                    break;
+                case MotionEvent.ACTION_UP:
+                    break;
+                default:
+                    break;
+            }
+            return true;
+        }
+    };
 
     @SuppressWarnings("deprecation")
     @Override
     public void onCreate() {
         // TODO Auto-generated method stub
         super.onCreate();
-        Log.d(Utils.LogTag, "ChatHeadService.onCreate()");
-
+        Logger.d("PrivacyShadeService.onCreate()");
     }
 
     private void handleStart() {
@@ -107,255 +260,162 @@ public class PrivacyShadeService extends Service {
         windowManager.getDefaultDisplay().getMetrics(displayMetrics);
         screenHeight = displayMetrics.heightPixels;
         screenWidth = displayMetrics.widthPixels;
-        scaleGestureDetector = new ScaleGestureDetector(this, new ScaleListener());
-
-        //addTransparencyCircle();
-        addTransparencyRectangle();
+        defaultShadeColor = getResources().getColor(R.color.black);
+        ArrayList<Float> coordinateList = getScreenCenterCoordinates(windowManager);
+        int x = Math.round(coordinateList.get(0));
+        int y = Math.round(coordinateList.get(1));
+        int topLeft = (screenHeight / 2) - defaultRectangleHeight / 2;
+        int bottomRight = (screenHeight / 2) + defaultRectangleHeight / 2;
+        Logger.d("Top left: " + topLeft);
+        Logger.d("Bottom Right: " + bottomRight);
+        transparentRect = new Rect(defaultRectangleTop, topLeft, screenWidth, bottomRight);
+        //addTransparentCircle();
+        addPrivacyShade();
+        addTransparentRectangle();
         addPrivacyShadeMenu();
-
+        //addOpacitySeekBar();
     }
 
-    private void addPrivacyShade() {
-        Log.d(TAG, "Add Privacy Shade");
-        privacyShadeView = (RelativeLayout) inflater.inflate(R.layout.layout_privacy_screen, null);
-        privacyShadeView.setBackgroundColor(Color.BLACK);
+    private void addTransparentRectangle() {
+        /*
+        Punch a transparent rectangle into the privacy shade
+         */
         privacyShadeBitmap = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.ARGB_8888);
-        privacyShadeBitmap.eraseColor(getResources().getColor(R.color.black90));
+        privacyShadeBitmap.eraseColor(defaultShadeColor);
         privacyShadeCanvas = new Canvas(privacyShadeBitmap);
         privacyShadeCanvas.drawBitmap(privacyShadeBitmap, new Matrix(), null);
         transparentPaint = new Paint();
         transparentPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC));
         transparentPaint.setColor(Color.TRANSPARENT);
         transparentPaint.setAntiAlias(true);
-        //privacyShadeCanvas.drar(x + 150, y + 150, circleImageView.getWidth()/2, transparentPaint);
-        Log.d(TAG, "Privacy shade rectangle dimensions:" + "\n" + "Rectangle X: " + rectangleX + "\n" + "Rectangle Y: " + rectangleY);
-        Log.d(TAG, "Privacy shade rectangle dimensions:" + "\n" + "Rectangle Height: " + rectangleView.getHeight() + "\n" + "Rectangle Width: " + rectangleView.getWidth());
-        privacyShadeCanvas.drawRect(0, rectangleY, 1080, rectangleY + rectangleView.getHeight(), transparentPaint);
+        privacyShadeCanvas.drawRect(transparentRect, transparentPaint);
+
+        int top = transparentRect.top;
+        int left = transparentRect.left;
+        int bottom = transparentRect.bottom;
+        int right = transparentRect.right;
+        Logger.d("Transparent Rectangle Top: " + top);
+        Logger.d("Transparent Rectangle Left: " + left);
+        Logger.d("Transparent Rectangle Bottom: " + bottom);
+        Logger.d("Transparent Rectangle Right: " + right);
         BitmapDrawable bitmapDrawable = new BitmapDrawable(privacyShadeBitmap);
         privacyShadeView.setBackground(bitmapDrawable);
+
+        /*
+        Add bottom line to the transparent rectangle
+         */
+        bottomLineView = (RelativeLayout) inflater.inflate(R.layout.layout_line, null);
+        //bottomLineView.setPadding(0,30,0,30);
+        WindowManager.LayoutParams bottomLineParams = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                defaultRectangleBorderWidth * 3,
+                WindowManager.LayoutParams.TYPE_PHONE,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT);
+        bottomLineParams.gravity = Gravity.TOP | Gravity.START;
+        bottomLineParams.x = 0;
+        Logger.d("Status Bar height: " + getStatusBarHeight(getApplicationContext()));
+        bottomLineParams.y = bottom - defaultRectangleBorderWidth / 2;
+        windowManager.addView(bottomLineView, bottomLineParams);
+
+        bottomLineView.post(new Runnable() {
+            @Override
+            public void run() {
+                bottomLineView.getLocationOnScreen(bottomLineCoordinates);
+                bottomLineCoordinateX = bottomLineCoordinates[0];
+                bottomLineCoordinateY = bottomLineCoordinates[1];
+                Logger.d("Line View Height: " + bottomLineView.getHeight());
+                Logger.d("Line View Width: " + bottomLineView.getWidth());
+                Logger.d("Line View X: " + bottomLineView.getX());
+                Logger.d("Line View Y: " + bottomLineView.getY());
+                Logger.d("Line View Screen X: " + bottomLineCoordinateX);
+                Logger.d("Line View Screen Y: " + bottomLineCoordinateY);
+
+            }
+        });
+
+        bottomLineView.setOnTouchListener(bottomLineTouchListener);
+
+        /*
+        Add topline view over transparent rectangle
+         */
+        topLineView = (RelativeLayout) inflater.inflate(R.layout.layout_line, null);
+        WindowManager.LayoutParams topLineParams = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                defaultRectangleBorderWidth * 3,
+                WindowManager.LayoutParams.TYPE_PHONE,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT);
+        topLineParams.gravity = Gravity.TOP | Gravity.START;
+        topLineParams.x = 0;
+        topLineParams.y = top - defaultRectangleBorderWidth / 2;
+        topLineView.setLayoutParams(topLineParams);
+        topLineView.post(new Runnable() {
+            @Override
+            public void run() {
+                //Logger.d("Line Padding top: " + topLineView.getY());
+            }
+        });
+
+        windowManager.addView(topLineView, topLineParams);
+        topLineView.setOnTouchListener(topLineTouchListener);
+    }
+
+    private void addPrivacyShade() {
+        privacyShadeView = (RelativeLayout) inflater.inflate(R.layout.layout_privacy_screen, null);
+
         szWindow.set(screenWidth, screenHeight);
 
 		/*
         Underlying touches are supported by TYPE_SYSTEM_OVERLAY and not by TYPE_PHONE
 		 */
-        WindowManager.LayoutParams privacyShadeParams = new WindowManager.LayoutParams(
+        privacyShadeParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT);
         privacyShadeParams.gravity = Gravity.TOP | Gravity.START;
         privacyShadeParams.x = 0;
         privacyShadeParams.y = 0;
+        privacyShadeParams.alpha = defaultOpacity;
         windowManager.addView(privacyShadeView, privacyShadeParams);
-
-
-        /*privacyShadeView.setOnTouchListener(new View.OnTouchListener() {
-            long time_start = 0, time_end = 0;
-			boolean isLongclick = false, inBounded = false;
-			int remove_img_width = 0, remove_img_height = 0;
-
-			Handler handler_longClick = new Handler();
-			Runnable runnable_longClick = new Runnable() {
-
-				@Override
-				public void run() {
-					// TODO Auto-generated method stub
-					Log.d(Utils.LogTag, "Into runnable_longClick");
-
-					isLongclick = true;
-					menuView.setVisibility(View.VISIBLE);
-					chathead_longclick();
-				}
-			};
-
-			@Override
-			public boolean onTouch(View v, MotionEvent event) {
-				WindowManager.LayoutParams layoutParams = (WindowManager.LayoutParams) privacyShadeView.getLayoutParams();
-
-				int x_cord = (int) event.getRawX();
-				int y_cord = (int) event.getRawY();
-				int x_cord_Destination, y_cord_Destination;
-
-				switch (event.getAction()) {
-					case MotionEvent.ACTION_DOWN:
-						time_start = System.currentTimeMillis();
-						handler_longClick.postDelayed(runnable_longClick, 600);
-
-						remove_img_width = removeImg.getLayoutParams().screenWidth;
-						remove_img_height = removeImg.getLayoutParams().screenHeight;
-
-						x_init_cord = x_cord;
-						y_init_cord = y_cord;
-
-						x_init_margin = layoutParams.x;
-						y_init_margin = layoutParams.y;
-
-						if(txtView != null){
-							txtView.setVisibility(View.GONE);
-							myHandler.removeCallbacks(myRunnable);
-						}
-						break;
-					case MotionEvent.ACTION_MOVE:
-						int x_diff_move = x_cord - x_init_cord;
-						int y_diff_move = y_cord - y_init_cord;
-
-						x_cord_Destination = x_init_margin + x_diff_move;
-						y_cord_Destination = y_init_margin + y_diff_move;
-
-						if(isLongclick){
-							int x_bound_left = szWindow.x / 2 - (int)(remove_img_width * 1.5);
-							int x_bound_right = szWindow.x / 2 +  (int)(remove_img_width * 1.5);
-							int y_bound_top = szWindow.y - (int)(remove_img_height * 1.5);
-
-							if((x_cord >= x_bound_left && x_cord <= x_bound_right) && y_cord >= y_bound_top){
-								inBounded = true;
-
-								int x_cord_remove = (int) ((szWindow.x - (remove_img_height * 1.5)) / 2);
-								int y_cord_remove = (int) (szWindow.y - ((remove_img_width * 1.5) + getStatusBarHeight() ));
-
-								if(removeImg.getLayoutParams().screenHeight == remove_img_height){
-									removeImg.getLayoutParams().screenHeight = (int) (remove_img_height * 1.5);
-									removeImg.getLayoutParams().screenWidth = (int) (remove_img_width * 1.5);
-
-									WindowManager.LayoutParams param_remove = (WindowManager.LayoutParams) menuView.getLayoutParams();
-									param_remove.x = x_cord_remove;
-									param_remove.y = y_cord_remove;
-
-									windowManager.updateViewLayout(menuView, param_remove);
-								}
-
-								layoutParams.x = x_cord_remove + (Math.abs(menuView.getWidth() - privacyShadeView.getWidth())) / 2;
-								layoutParams.y = y_cord_remove + (Math.abs(menuView.getHeight() - privacyShadeView.getHeight())) / 2 ;
-
-								windowManager.updateViewLayout(privacyShadeView, layoutParams);
-								break;
-							}else{
-								inBounded = false;
-								removeImg.getLayoutParams().screenHeight = remove_img_height;
-								removeImg.getLayoutParams().screenWidth = remove_img_width;
-
-								WindowManager.LayoutParams param_remove = (WindowManager.LayoutParams) menuView.getLayoutParams();
-								int x_cord_remove = (szWindow.x - menuView.getWidth()) / 2;
-								int y_cord_remove = szWindow.y - (menuView.getHeight() + getStatusBarHeight() );
-
-								param_remove.x = x_cord_remove;
-								param_remove.y = y_cord_remove;
-
-								windowManager.updateViewLayout(menuView, param_remove);
-							}
-
-						}
-
-
-						layoutParams.x = x_cord_Destination;
-						layoutParams.y = y_cord_Destination;
-
-						windowManager.updateViewLayout(privacyShadeView, layoutParams);
-						break;
-					case MotionEvent.ACTION_UP:
-						isLongclick = false;
-						menuView.setVisibility(View.GONE);
-						removeImg.getLayoutParams().screenHeight = remove_img_height;
-						removeImg.getLayoutParams().screenWidth = remove_img_width;
-						handler_longClick.removeCallbacks(runnable_longClick);
-
-						if(inBounded){
-							if(MyDialog.active){
-								MyDialog.myDialog.finish();
-							}
-
-							stopService(new Intent(ChatHeadService.this, ChatHeadService.class));
-							inBounded = false;
-							break;
-						}
-
-
-						int x_diff = x_cord - x_init_cord;
-						int y_diff = y_cord - y_init_cord;
-
-						if(Math.abs(x_diff) < 5 && Math.abs(y_diff) < 5){
-							time_end = System.currentTimeMillis();
-							if((time_end - time_start) < 300){
-								chathead_click();
-							}
-						}
-
-						y_cord_Destination = y_init_margin + y_diff;
-
-						int BarHeight =  getStatusBarHeight();
-						if (y_cord_Destination < 0) {
-							y_cord_Destination = 0;
-						} else if (y_cord_Destination + (privacyShadeView.getHeight() + BarHeight) > szWindow.y) {
-							y_cord_Destination = szWindow.y - (privacyShadeView.getHeight() + BarHeight );
-						}
-						layoutParams.y = y_cord_Destination;
-
-						inBounded = false;
-						resetPosition(x_cord);
-
-						break;
-					default:
-						Log.d(Utils.LogTag, "privacyShadeView.setOnTouchListener  -> event.getAction() : default");
-						break;
-				}
-				return true;
-			}
-		});*/
-    }
-
-    private void addOpacitySeekBar() {
-        seekBarView = (RelativeLayout) inflater.inflate(R.layout.layout_brightness_seekbar, null);
-        WindowManager.LayoutParams paramRemove = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_PHONE,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                PixelFormat.TRANSLUCENT);
-        paramRemove.gravity = Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL;
-        opacitySeekBar = (SeekBar) seekBarView.findViewById(R.id.brightness_seekbar);
-        opacitySeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-
-            }
-        });
-        windowManager.addView(seekBarView, paramRemove);
-        seekBarView.setVisibility(View.GONE);
-    }
-
-    private void showOpacitySeekBar() {
-
-    }
-
-    private void hideOpacitySeekBar() {
-
     }
 
     private void addPrivacyShadeMenu() {
-        menuView = (LinearLayout) inflater.inflate(R.layout.layout_remove_privacy_shade, null);
-        WindowManager.LayoutParams paramRemove = new WindowManager.LayoutParams(
+        menuView = (LinearLayout) inflater.inflate(R.layout.layout_menu_privacy_shade, null);
+        //menuView.setPadding(0,0,32,0);
+        WindowManager.LayoutParams menuParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_PHONE,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
                 PixelFormat.TRANSLUCENT);
-        paramRemove.gravity = Gravity.TOP | Gravity.END;
+        menuParams.gravity = Gravity.TOP | Gravity.END;
 
         removeShadeButton = (ImageButton) menuView.findViewById(R.id.button_close_privacy_screen);
         toggleCircleButton = (ImageButton) menuView.findViewById(R.id.toggle_circle_imageButton);
         toggleRectangleButton = (ImageButton) menuView.findViewById(R.id.toggle_rectangle_imageButton);
         toggleOpacityButton = (ImageButton) menuView.findViewById(R.id.toggle_brightness_imageButton);
+
+
+        /*removeShadeButton.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        removeShadeButton.requestFocusFromTouch();
+                        Log.d("Touch","got");
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                        removeShadeButton.requestFocusFromTouch();
+                        Log.d("Touch","got");
+                        return true;
+                    default:
+                        return true;
+                }
+            }
+        });*/
 
         removeShadeButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -363,196 +423,28 @@ public class PrivacyShadeService extends Service {
                 stopSelf();
             }
         });
-        windowManager.addView(menuView, paramRemove);
-    }
 
-    private void addTransparencyRectangle() {
-        rectangleView = (RelativeLayout) inflater.inflate(R.layout.layout_rectangle, null);
-        WindowManager.LayoutParams paramRectangle = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_PHONE,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                PixelFormat.TRANSLUCENT);
-        paramRectangle.gravity = Gravity.START | Gravity.CENTER_VERTICAL;
+        toggleOpacityButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (brightnessSeekBarView.getVisibility() == View.VISIBLE) {
+                    brightnessSeekBarView.setVisibility(View.GONE);
+                } else {
+                    brightnessSeekBarView.setVisibility(View.VISIBLE);
+                }
+            }
+        });
 
-
-        rectangleImageView = (ImageView) rectangleView.findViewById(R.id.transparent_rectangle_imageView);
-        windowManager.addView(rectangleView, paramRectangle);
-
-        rectangleView.post(new Runnable() {
+        windowManager.addView(menuView, menuParams);
+        menuView.post(new Runnable() {
             @Override
             public void run() {
-                Log.d(TAG, "Calculating dimensions of rectangle");
-                rectangleView.getLocationOnScreen(rectangleLocationCoordinates);
-                rectangleX = rectangleLocationCoordinates[0];
-                rectangleY = rectangleLocationCoordinates[1];
-                Log.d(TAG, "Default Location on screen X: " + rectangleX + "\t Y: " + rectangleY);
-                Log.d(TAG, "Rectangle left: " + rectangleView.getLeft());
-                Log.d(TAG, "Rectangle right: " + rectangleView.getRight());
-                Log.d(TAG, "Rectangle top:" + rectangleView.getTop());
-                Log.d(TAG, "Rectangle bottom: " + rectangleView.getBottom());
-                Log.d(TAG, "Rectangle  getX(): " + rectangleView.getX());
-                Log.d(TAG, "Rectangle  getY(): " + rectangleView.getY());
-                Log.d(TAG, "Rectangle Parent Height:" + rectangleView.getHeight());
-                Log.d(TAG, "Rectangle Parent Width:" + rectangleView.getWidth());
-
-                addPrivacyShade();
-            }
-        });
-
-        rectangleView.setOnTouchListener(new View.OnTouchListener() {
-            int numberOfFingers;
-            long time_start = 0, time_end = 0;
-            boolean isLongclick = false, inBounded = false;
-            int remove_img_width = 0, remove_img_height = 0;
-
-            Handler handler_longClick = new Handler();
-            Runnable runnable_longClick = new Runnable() {
-
-                @Override
-                public void run() {
-                    // TODO Auto-generated method stub
-                    Log.d(Utils.LogTag, "Into runnable_longClick");
-
-                    isLongclick = true;
-                    menuView.setVisibility(View.VISIBLE);
-                    //chathead_longclick();
-                }
-            };
-            int x_cord_Destination, y_cord_Destination;
-
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                numberOfFingers = event.getPointerCount();
-                WindowManager.LayoutParams layoutParams = (WindowManager.LayoutParams) rectangleView.getLayoutParams();
-
-                int x_cord = (int) event.getRawX();
-                int y_cord = (int) event.getRawY();
-
-
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        time_start = System.currentTimeMillis();
-                        //handler_longClick.postDelayed(runnable_longClick, 600);
-
-                        x_init_cord = x_cord;
-                        y_init_cord = y_cord;
-
-                        x_init_margin = layoutParams.x;
-                        y_init_margin = layoutParams.y;
-
-                        break;
-                    case MotionEvent.ACTION_MOVE:
-                        int x_diff_move = x_cord - x_init_cord;
-                        int y_diff_move = y_cord - y_init_cord;
-
-                        x_cord_Destination = x_init_margin + x_diff_move;
-                        y_cord_Destination = y_init_margin + y_diff_move;
-
-                        /*if(isLongclick){
-                            int x_bound_left = szWindow.x / 2 - (int)(remove_img_width * 1.5);
-                            int x_bound_right = szWindow.x / 2 +  (int)(remove_img_width * 1.5);
-                            int y_bound_top = szWindow.y - (int)(remove_img_height * 1.5);
-
-                            if((x_cord >= x_bound_left && x_cord <= x_bound_right) && y_cord >= y_bound_top){
-                                inBounded = true;
-
-                                int x_cord_remove = (int) ((szWindow.x - (remove_img_height * 1.5)) / 2);
-                                int y_cord_remove = (int) (szWindow.y - ((remove_img_width * 1.5) + getStatusBarHeight() ));
-
-
-                                layoutParams.x = x_cord_remove + (Math.abs(menuView.getWidth() - circleView.getWidth())) / 2;
-                                layoutParams.y = y_cord_remove + (Math.abs(menuView.getHeight() - circleView.getHeight())) / 2 ;
-
-                                windowManager.updateViewLayout(circleView, layoutParams);
-                                break;
-                            }else{
-                                inBounded = false;
-
-                                WindowManager.LayoutParams param_remove = (WindowManager.LayoutParams) menuView.getLayoutParams();
-                                int x_cord_remove = (szWindow.x - menuView.getWidth()) / 2;
-                                int y_cord_remove = szWindow.y - (menuView.getHeight() + getStatusBarHeight() );
-
-                                param_remove.x = x_cord_remove;
-                                param_remove.y = y_cord_remove;
-
-                                windowManager.updateViewLayout(menuView, param_remove);
-                            }
-
-                        }*/
-
-
-                        layoutParams.x = x_cord_Destination;
-                        layoutParams.y = y_cord_Destination;
-
-                        windowManager.updateViewLayout(rectangleView, layoutParams);
-
-                        rectangleView.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                int[] location = new int[2];
-                                Log.d(TAG, "On Rectangle Moved X: " + rectangleImageView.getX());
-                                Log.d(TAG, "On Rectangle Moved Y: " + rectangleImageView.getY());
-                                rectangleView.getLocationOnScreen(location);
-                                int x = location[0];
-                                int y = location[1];
-                                Log.d(TAG, "Location on screen X: " + x + "\t Y: " + y);
-                                privacyShadeView.setBackgroundColor(Color.BLACK);
-                                privacyShadeBitmap = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.ARGB_8888);
-                                privacyShadeBitmap.eraseColor(getResources().getColor(R.color.black90));
-                                privacyShadeCanvas = new Canvas(privacyShadeBitmap);
-                                privacyShadeCanvas.drawBitmap(privacyShadeBitmap, new Matrix(), null);
-                                transparentPaint = new Paint();
-                                transparentPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC));
-                                transparentPaint.setColor(Color.TRANSPARENT);
-                                transparentPaint.setAntiAlias(true);
-                                //privacyShadeCanvas.drar(x + 150, y + 150, circleImageView.getWidth()/2, transparentPaint);
-                                privacyShadeCanvas.drawRect(0, y, 1080, y + rectangleView.getHeight(), transparentPaint);
-                                BitmapDrawable bitmapDrawable = new BitmapDrawable(privacyShadeBitmap);
-                                privacyShadeView.setBackground(bitmapDrawable);
-                            }
-                        });
-
-                        break;
-                    case MotionEvent.ACTION_UP:
-
-                        // handler_longClick.removeCallbacks(runnable_longClick);
-
-                        int x_diff = x_cord - x_init_cord;
-                        int y_diff = y_cord - y_init_cord;
-
-                        if (Math.abs(x_diff) < 5 && Math.abs(y_diff) < 5) {
-                            time_end = System.currentTimeMillis();
-                            if ((time_end - time_start) < 300) {
-                                // chathead_click();
-                            }
-                        }
-
-                        y_cord_Destination = y_init_margin + y_diff;
-
-                        int BarHeight = getStatusBarHeight();
-                        if (y_cord_Destination < 0) {
-                            y_cord_Destination = 0;
-                        } else if (y_cord_Destination + (rectangleView.getHeight() + BarHeight) > szWindow.y) {
-                            y_cord_Destination = szWindow.y - (rectangleView.getHeight() + BarHeight);
-                        }
-                        layoutParams.y = y_cord_Destination;
-
-                        inBounded = false;
-                        resetPosition(x_cord);
-
-                        break;
-                    default:
-                        Log.d(Utils.LogTag, "privacyShadeView.setOnTouchListener  -> event.getAction() : default");
-                        break;
-                }
-                return true;
+                addOpacitySeekBar();
             }
         });
     }
 
-    private void addTransparencyCircle() {
+    private void addTransparentCircle() {
         circleView = (RelativeLayout) inflater.inflate(R.layout.layout_circle, null);
         WindowManager.LayoutParams paramRemove = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
@@ -585,367 +477,107 @@ public class PrivacyShadeService extends Service {
                 Log.d(TAG, "Circle Width DP:" + pxToDp(circleImageView.getWidth()));
             }
         });
+    }
 
+    private void addOpacitySeekBar() {
+        brightnessSeekBarView = (RelativeLayout) inflater.inflate(R.layout.layout_brightness_seekbar, null);
+        //brightnessSeekBarView.setPadding(72,0,72,0);
+        WindowManager.LayoutParams seekBarParams = new WindowManager.LayoutParams(
+                screenWidth - dpToPx(56),
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT);
+        seekBarParams.gravity = Gravity.TOP | Gravity.START;
+        seekBarParams.y = menuView.getBottom() - 72 - 32;
 
-        circleView.setOnTouchListener(new View.OnTouchListener() {
-            long time_start = 0, time_end = 0;
-            boolean isLongclick = false, inBounded = false;
-            int remove_img_width = 0, remove_img_height = 0;
-
-            Handler handler_longClick = new Handler();
-            Runnable runnable_longClick = new Runnable() {
-
-                @Override
-                public void run() {
-                    // TODO Auto-generated method stub
-                    Log.d(Utils.LogTag, "Into runnable_longClick");
-
-                    isLongclick = true;
-                    menuView.setVisibility(View.VISIBLE);
-                    //chathead_longclick();
-                }
-            };
-            int x_cord_Destination, y_cord_Destination;
+        brightnessSeekBar = (SeekBar) brightnessSeekBarView.findViewById(R.id.brightness_seekbar);
+        brightnessSeekBar.setMax(100);
+        brightnessSeekBar.setProgress(defaultOpacity);
+        brightnessSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                float opacity = (float) (100 - progress) / 100;
+                Logger.d("On Progress Changed: " + opacity);
+                privacyShadeParams.alpha = opacity;
+                windowManager.updateViewLayout(privacyShadeView, privacyShadeParams);
+            }
 
             @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                WindowManager.LayoutParams layoutParams = (WindowManager.LayoutParams) circleView.getLayoutParams();
+            public void onStartTrackingTouch(SeekBar seekBar) {
 
-                int x_cord = (int) event.getRawX();
-                int y_cord = (int) event.getRawY();
+            }
 
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
 
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        time_start = System.currentTimeMillis();
-                        //handler_longClick.postDelayed(runnable_longClick, 600);
-
-                        x_init_cord = x_cord;
-                        y_init_cord = y_cord;
-
-                        x_init_margin = layoutParams.x;
-                        y_init_margin = layoutParams.y;
-
-                        break;
-                    case MotionEvent.ACTION_MOVE:
-                        int x_diff_move = x_cord - x_init_cord;
-                        int y_diff_move = y_cord - y_init_cord;
-
-                        x_cord_Destination = x_init_margin + x_diff_move;
-                        y_cord_Destination = y_init_margin + y_diff_move;
-
-                        /*if(isLongclick){
-                            int x_bound_left = szWindow.x / 2 - (int)(remove_img_width * 1.5);
-                            int x_bound_right = szWindow.x / 2 +  (int)(remove_img_width * 1.5);
-                            int y_bound_top = szWindow.y - (int)(remove_img_height * 1.5);
-
-                            if((x_cord >= x_bound_left && x_cord <= x_bound_right) && y_cord >= y_bound_top){
-                                inBounded = true;
-
-                                int x_cord_remove = (int) ((szWindow.x - (remove_img_height * 1.5)) / 2);
-                                int y_cord_remove = (int) (szWindow.y - ((remove_img_width * 1.5) + getStatusBarHeight() ));
-
-
-                                layoutParams.x = x_cord_remove + (Math.abs(menuView.getWidth() - circleView.getWidth())) / 2;
-                                layoutParams.y = y_cord_remove + (Math.abs(menuView.getHeight() - circleView.getHeight())) / 2 ;
-
-                                windowManager.updateViewLayout(circleView, layoutParams);
-                                break;
-                            }else{
-                                inBounded = false;
-
-                                WindowManager.LayoutParams param_remove = (WindowManager.LayoutParams) menuView.getLayoutParams();
-                                int x_cord_remove = (szWindow.x - menuView.getWidth()) / 2;
-                                int y_cord_remove = szWindow.y - (menuView.getHeight() + getStatusBarHeight() );
-
-                                param_remove.x = x_cord_remove;
-                                param_remove.y = y_cord_remove;
-
-                                windowManager.updateViewLayout(menuView, param_remove);
-                            }
-
-                        }*/
-
-
-                        layoutParams.x = x_cord_Destination;
-                        layoutParams.y = y_cord_Destination;
-
-
-                        windowManager.updateViewLayout(circleView, layoutParams);
-                        int[] location = new int[2];
-                        Log.d(TAG, "On Circle Moved X: " + circleImageView.getX());
-                        Log.d(TAG, "On Circle Moved Y: " + circleImageView.getY());
-                        circleView.getLocationOnScreen(location);
-                        int x = location[0];
-                        int y = location[1];
-                        Log.d(TAG, "Location on screen X: " + x + "\t Y: " + y);
-                        privacyShadeView.setBackgroundColor(Color.BLACK);
-                        privacyShadeBitmap = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.ARGB_8888);
-                        privacyShadeBitmap.eraseColor(getResources().getColor(R.color.black90));
-                        privacyShadeCanvas = new Canvas(privacyShadeBitmap);
-                        privacyShadeCanvas.drawBitmap(privacyShadeBitmap, new Matrix(), null);
-                        transparentPaint = new Paint();
-                        transparentPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC));
-                        transparentPaint.setColor(Color.TRANSPARENT);
-                        transparentPaint.setAntiAlias(true);
-                        privacyShadeCanvas.drawCircle(x + 150, y + 150, circleImageView.getWidth() / 2, transparentPaint);
-                        BitmapDrawable bitmapDrawable = new BitmapDrawable(privacyShadeBitmap);
-                        privacyShadeView.setBackground(bitmapDrawable);
-                        break;
-                    case MotionEvent.ACTION_UP:
-
-                        // handler_longClick.removeCallbacks(runnable_longClick);
-
-                        int x_diff = x_cord - x_init_cord;
-                        int y_diff = y_cord - y_init_cord;
-
-                        if (Math.abs(x_diff) < 5 && Math.abs(y_diff) < 5) {
-                            time_end = System.currentTimeMillis();
-                            if ((time_end - time_start) < 300) {
-                                // chathead_click();
-                            }
-                        }
-
-                        y_cord_Destination = y_init_margin + y_diff;
-
-                        int BarHeight = getStatusBarHeight();
-                        if (y_cord_Destination < 0) {
-                            y_cord_Destination = 0;
-                        } else if (y_cord_Destination + (circleView.getHeight() + BarHeight) > szWindow.y) {
-                            y_cord_Destination = szWindow.y - (circleView.getHeight() + BarHeight);
-                        }
-                        layoutParams.y = y_cord_Destination;
-
-                        inBounded = false;
-                        resetPosition(x_cord);
-
-                        break;
-                    default:
-                        Log.d(Utils.LogTag, "privacyShadeView.setOnTouchListener  -> event.getAction() : default");
-                        break;
-                }
-                return true;
             }
         });
+        windowManager.addView(brightnessSeekBarView, seekBarParams);
+        brightnessSeekBarView.setVisibility(View.GONE);
     }
 
-    private void drawCanvasCircle(Canvas canvas, Bitmap bitmap, int x, int y, int radius) {
-
-
-    }
-
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        // TODO Auto-generated method stub
-        super.onConfigurationChanged(newConfig);
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-            windowManager.getDefaultDisplay().getSize(szWindow);
-        } else {
-            int w = windowManager.getDefaultDisplay().getWidth();
-            int h = windowManager.getDefaultDisplay().getHeight();
-            szWindow.set(w, h);
-        }
-
-        WindowManager.LayoutParams layoutParams = (WindowManager.LayoutParams) privacyShadeView.getLayoutParams();
-
-        if (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            Log.d(Utils.LogTag, "ChatHeadService.onConfigurationChanged -> landscape");
-
-            if (txtView != null) {
-                txtView.setVisibility(View.GONE);
-            }
-
-            if (layoutParams.y + (privacyShadeView.getHeight() + getStatusBarHeight()) > szWindow.y) {
-                layoutParams.y = szWindow.y - (privacyShadeView.getHeight() + getStatusBarHeight());
-                windowManager.updateViewLayout(privacyShadeView, layoutParams);
-            }
-
-            if (layoutParams.x != 0 && layoutParams.x < szWindow.x) {
-                resetPosition(szWindow.x);
-            }
-
-        } else if (newConfig.orientation == Configuration.ORIENTATION_PORTRAIT) {
-            Log.d(Utils.LogTag, "ChatHeadService.onConfigurationChanged -> portrait");
-
-            if (txtView != null) {
-                txtView.setVisibility(View.GONE);
-            }
-
-            if (layoutParams.x > szWindow.x) {
-                resetPosition(szWindow.x);
-            }
-
-        }
+    private void showOpacitySeekBar() {
 
     }
 
-    private void resetPosition(int x_cord_now) {
-        if (x_cord_now <= szWindow.x / 2) {
-            isLeft = true;
-            moveToLeft(x_cord_now);
-
-        } else {
-            isLeft = false;
-            moveToRight(x_cord_now);
-
-        }
-
-    }
-
-    private void moveToLeft(final int x_cord_now) {
-        final int x = szWindow.x - x_cord_now;
-
-        new CountDownTimer(500, 5) {
-            WindowManager.LayoutParams mParams = (WindowManager.LayoutParams) privacyShadeView.getLayoutParams();
-
-            public void onTick(long t) {
-                long step = (500 - t) / 5;
-                mParams.x = 0 - (int) (double) bounceValue(step, x);
-                windowManager.updateViewLayout(privacyShadeView, mParams);
-            }
-
-            public void onFinish() {
-                mParams.x = 0;
-                windowManager.updateViewLayout(privacyShadeView, mParams);
-            }
-        }.start();
-    }
-
-    private void moveToRight(final int x_cord_now) {
-        new CountDownTimer(500, 5) {
-            WindowManager.LayoutParams mParams = (WindowManager.LayoutParams) privacyShadeView.getLayoutParams();
-
-            public void onTick(long t) {
-                long step = (500 - t) / 5;
-                mParams.x = szWindow.x + (int) (double) bounceValue(step, x_cord_now) - privacyShadeView.getWidth();
-                windowManager.updateViewLayout(privacyShadeView, mParams);
-            }
-
-            public void onFinish() {
-                mParams.x = szWindow.x - privacyShadeView.getWidth();
-                windowManager.updateViewLayout(privacyShadeView, mParams);
-            }
-        }.start();
-    }
-
-    private double bounceValue(long step, long scale) {
-        double value = scale * Math.exp(-0.055 * step) * Math.cos(0.08 * step);
-        return value;
-    }
-
-    private int getStatusBarHeight() {
-        int statusBarHeight = (int) Math.ceil(25 * getApplicationContext().getResources().getDisplayMetrics().density);
-        return statusBarHeight;
-    }
-
-    private void chathead_click() {
-        if (MyDialog.active) {
-            MyDialog.myDialog.finish();
-        } else {
-            Intent it = new Intent(this, MyDialog.class).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            startActivity(it);
-        }
-
-    }
-
-    private void chathead_longclick() {
-        Log.d(Utils.LogTag, "Into ChatHeadService.chathead_longclick() ");
-
-        WindowManager.LayoutParams param_remove = (WindowManager.LayoutParams) menuView.getLayoutParams();
-        int x_cord_remove = (szWindow.x - menuView.getWidth()) / 2;
-        int y_cord_remove = szWindow.y - (menuView.getHeight() + getStatusBarHeight());
-
-        param_remove.x = x_cord_remove;
-        param_remove.y = y_cord_remove;
-
-        windowManager.updateViewLayout(menuView, param_remove);
-    }
-
-    private void showMsg(String sMsg) {
-        if (txtView != null && privacyShadeView != null) {
-            Log.d(Utils.LogTag, "ChatHeadService.showMsg -> sMsg=" + sMsg);
-            txt1.setText(sMsg);
-            myHandler.removeCallbacks(myRunnable);
-
-            WindowManager.LayoutParams param_chathead = (WindowManager.LayoutParams) privacyShadeView.getLayoutParams();
-            WindowManager.LayoutParams param_txt = (WindowManager.LayoutParams) txtView.getLayoutParams();
-
-            txt_linearlayout.getLayoutParams().height = privacyShadeView.getHeight();
-            txt_linearlayout.getLayoutParams().width = szWindow.x / 2;
-
-			/*if(isLeft){
-				param_txt.x = param_chathead.x + chatheadImg.getWidth();
-				param_txt.y = param_chathead.y;
-
-				txt_linearlayout.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-			}else{
-				param_txt.x = param_chathead.x - szWindow.x / 2;
-				param_txt.y = param_chathead.y;
-
-				txt_linearlayout.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-			}*/
-
-            txtView.setVisibility(View.VISIBLE);
-            windowManager.updateViewLayout(txtView, param_txt);
-
-            myHandler.postDelayed(myRunnable, 4000);
-
-        }
+    private void hideOpacitySeekBar() {
 
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // TODO Auto-generated method stub
-        Log.d(Utils.LogTag, "ChatHeadService.onStartCommand() -> startId=" + startId);
-
+        Logger.d("PrivacyShadeService.onStartCommand()");
         if (intent != null) {
-            Bundle bd = intent.getExtras();
-
-            if (bd != null)
-                sMsg = bd.getString(Utils.EXTRA_MSG);
-
-            if (sMsg != null && sMsg.length() > 0) {
-                if (startId == Service.START_STICKY) {
-                    new Handler().postDelayed(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            // TODO Auto-generated method stub
-                            showMsg(sMsg);
+            Logger.d("Intent is not null");
+            if (intent.getAction() != null) {
+                Logger.d("Intent action is not null");
+                if (intent.getAction().equals(Constants.STARTFOREGROUND_ACTION)) {
+                    handleStart();
+                    if (!isRunning) {
+                        ScheduledExecutorService backgroundService = Executors.newSingleThreadScheduledExecutor();
+                        backgroundService.scheduleAtFixedRate(new TimerIncreasedRunnable(
+                                this), 0, 1000, TimeUnit.MILLISECONDS);
+                        isRunning = true;
                         }
-                    }, 300);
-
-                } else {
-                    showMsg(sMsg);
+                    startForegroundService();
+                } else if (intent.getAction().equals(Constants.STOPFOREGROUND_ACTION)) {
+                    //Stop the service
+                    isRunning = false;
+                    stopSelf();
+                    ServiceBootstrap.stopAlwaysOnService(this);
                 }
-
+                }
             }
+        return START_STICKY;
+    }
 
-        }
+    // Run service in foreground so it is less likely to be killed by system
+    private void startForegroundService() {
 
-        if (startId == Service.START_STICKY) {
-            handleStart();
-            return super.onStartCommand(intent, flags, startId);
-        } else {
-            return Service.START_NOT_STICKY;
-        }
+        Intent stopServiceIntent = new Intent(this, PrivacyShadeService.class);
+        stopServiceIntent.setAction(Constants.STOPFOREGROUND_ACTION);
+        PendingIntent stopServicePendingIntent = PendingIntent.getService(this, 0, stopServiceIntent, PendingIntent.FLAG_CANCEL_CURRENT);
 
+        Notification notification = new NotificationCompat.Builder(this)
+                .setContentTitle(getResources().getString(R.string.app_name) + " " + getResources().getString(R.string.notification_joiner_shade_is_on))
+                .setContentText(getResources().getString(R.string.notification_turn_off_shade))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setSmallIcon(android.R.color.transparent)
+                .setContentIntent(stopServicePendingIntent)
+                .setOngoing(true)
+                .setAutoCancel(false)
+                .build();
+        startForeground(9999, notification);
     }
 
     @Override
     public void onDestroy() {
-        // TODO Auto-generated method stub
         super.onDestroy();
 
         if (privacyShadeView != null) {
             windowManager.removeView(privacyShadeView);
         }
-
-		/*if(txtView != null){
-			windowManager.menuView(txtView);
-		}*/
 
         if (menuView != null) {
             windowManager.removeView(menuView);
@@ -955,30 +587,57 @@ public class PrivacyShadeService extends Service {
             windowManager.removeView(circleView);
         }
 
-        if (rectangleView != null) {
-            windowManager.removeView(rectangleView);
+        if (bottomLineView != null) {
+            windowManager.removeView(bottomLineView);
         }
 
+        if (topLineView != null) {
+            windowManager.removeView(topLineView);
+        }
+
+        if (brightnessSeekBarView != null) {
+            windowManager.removeView(brightnessSeekBarView);
+        }
+
+        Logger.d("PrivacyShadeService.onStop, starting notification service");
+        Intent startServiceIntent = new Intent(Constants.STARTFOREGROUND_ACTION);
+        startServiceIntent.setClass(this, PersistentNotificationService.class);
+        startServiceIntent.setAction(Constants.STARTFOREGROUND_ACTION);
+        startService(startServiceIntent);
     }
 
     @Override
     public IBinder onBind(Intent intent) {
-        // TODO Auto-generated method stub
-        Log.d(Utils.LogTag, "ChatHeadService.onBind()");
+        Logger.d("PrivacyShadeService.onBind()");
         return null;
     }
 
-    private class ScaleListener extends ScaleGestureDetector.
-            SimpleOnScaleGestureListener {
+    public class TimerIncreasedRunnable implements Runnable {
+        private SharedPreferences currentSharedPreferences;
+
+        TimerIncreasedRunnable(Context context) {
+            this.currentSharedPreferences = context.getSharedPreferences(
+                    Constants.SHAREDPREF_APP_STRING, MODE_PRIVATE);
+        }
+
         @Override
-        public boolean onScale(ScaleGestureDetector detector) {
-            float scaleFactor = detector.getScaleFactor();
-            scaleFactor = Math.max(0.1f, Math.min(scaleFactor, 5.0f));
-            matrix.setScale(scaleFactor, scaleFactor);
-            rectangleImageView.setImageMatrix(matrix);
-            return true;
+        public void run() {
+            int timeCount = this.readTimeCount() + 1;
+            this.writeTimeCount(timeCount);
+            int currentEpochTimeInSeconds = (int) (System.currentTimeMillis() / 1000L);
+            Log.v(TAG, "Count:" + timeCount + " at time:"
+                    + currentEpochTimeInSeconds);
+        }
+
+        private int readTimeCount() {
+            return this.currentSharedPreferences.getInt(
+                    Constants.SHAREDPREF_RUNNINGTIMECOUNT_STRING, 0);
+        }
+
+        private void writeTimeCount(int timeCount) {
+            this.currentSharedPreferences.edit().putInt(
+                    Constants.SHAREDPREF_RUNNINGTIMECOUNT_STRING,
+                    timeCount).apply();
         }
     }
-
-
 }

@@ -12,5 +12,5 @@
 
     <color name="blue">#2d5d88</color>
     <color name="blue_A2E5F5">#A2E5F5</color>
-    <color name="black90">#99000000</color>
+    <color name="black">#000000</color>
 </resources>

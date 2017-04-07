@@ -1,3 +1,7 @@
 <resources>
-    <string name="app_name">PrivacyScreen</string>
+    <string name="app_name">Privacy Screen</string>
+    <string name="notification_turn_on_shade">Tap to turn on</string>
+    <string name="notification_turn_off_shade">Tap to turn off</string>
+    <string name="notification_joiner_shade_is_on">is on</string>
+    <string name="notification_joiner_shade_is_off">is off</string>
 </resources>

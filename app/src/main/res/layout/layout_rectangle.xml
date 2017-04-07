@@ -3,12 +3,17 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content">
 
-    <ImageView
-        android:id="@+id/transparent_rectangle_imageView"
-        android:layout_width="match_parent"
-        android:layout_height="100dp"
-        android:adjustViewBounds="true"
-        android:background="@drawable/rectangle"
-        android:scaleType="matrix" />
+    <com.sand5.privacyscreen.utils.ZoomLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone">
 
+        <ImageView
+            android:id="@+id/transparent_rectangle_imageView"
+            android:layout_width="match_parent"
+            android:layout_height="100dp"
+            android:adjustViewBounds="true"
+            android:background="@drawable/rectangle"
+            android:visibility="gone" />
+    </com.sand5.privacyscreen.utils.ZoomLayout>
 </RelativeLayout>

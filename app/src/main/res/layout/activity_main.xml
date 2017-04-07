@@ -18,10 +18,9 @@
 
     <Button
         android:id="@+id/btnStartService"
-        android:layout_width="220dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_above="@id/btnMsg"
-        android:layout_centerHorizontal="true"
+        android:layout_centerInParent="true"
         android:text="Start Service" />
 
 
