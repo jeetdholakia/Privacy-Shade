@@ -4,8 +4,6 @@ package com.sand5.privacyscreen.services;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.app.usage.UsageStats;
-import android.app.usage.UsageStatsManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -22,9 +20,7 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
-import android.os.Build;
 import android.os.IBinder;
-import android.support.annotation.RequiresApi;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.view.animation.FastOutSlowInInterpolator;
 import android.support.v7.app.NotificationCompat;
@@ -44,8 +40,6 @@ import android.widget.SeekBar;
 import com.orhanobut.logger.Logger;
 import com.sand5.privacyscreen.PrivacyScreenApplication;
 import com.sand5.privacyscreen.R;
-import com.sand5.privacyscreen.events.OnPhoneIdleEvent;
-import com.sand5.privacyscreen.events.OnPhoneReceivedEvent;
 import com.sand5.privacyscreen.events.OnScreenLockEvent;
 import com.sand5.privacyscreen.events.OnScreenUnLockEvent;
 import com.sand5.privacyscreen.receivers.ScreenLockReceiver;
@@ -58,7 +52,6 @@ import com.transitionseverywhere.Fade;
 import com.transitionseverywhere.Transition;
 import com.transitionseverywhere.TransitionManager;
 
-import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -71,7 +64,6 @@ public class PrivacyShadeService extends Service {
     // TODO: 4/2/17 Enable pinch to zoom (from feedback)
     // TODO: 4/7/17 Save preferences (coordinates when unlocked)
     // TODO: 4/7/17 Remove lag on dragging
-    // TODO: 4/7/17 Handle screen lock/unlock, call received use-cases
     // TODO: 4/8/17 Rounded icons
     // TODO: 4/8/17 Add landscape mode
     // TODO: 4/8/17 Add Pulling indicators
@@ -407,9 +399,9 @@ public class PrivacyShadeService extends Service {
                 addTransparentCircle();
             }
         }
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP_MR1) {
+        /*if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP_MR1) {
             collectAppUsageData();
-        }
+        }*/
         setUpScreenLockReceiver();
     }
 
@@ -764,20 +756,6 @@ public class PrivacyShadeService extends Service {
         }
     }
 
-    @Subscribe
-    public void onPhoneCallReceived(OnPhoneReceivedEvent onPhoneReceivedEvent) {
-        Logger.d("On Call Received Otto");
-        privacyShadeParams.alpha = 0.2f;
-        windowManager.updateViewLayout(privacyShadeView, privacyShadeParams);
-    }
-
-    @Subscribe
-    public void onPhoneIdle(OnPhoneIdleEvent onPhoneIdleEvent) {
-        Logger.d("On Call idle Otto");
-        privacyShadeParams.alpha = getDefaultOpacity();
-        windowManager.updateViewLayout(privacyShadeView, privacyShadeParams);
-    }
-
     private void changeShape(ShapeType shapeType) {
 
         if (privacyShadeView != null) {
@@ -829,7 +807,7 @@ public class PrivacyShadeService extends Service {
         registerReceiver(screenLockReceiver, filter);
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP_MR1)
+    /*@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP_MR1)
     private void collectAppUsageData() {
         UsageStatsManager usageStatsManager = (UsageStatsManager) getSystemService(Context.USAGE_STATS_SERVICE);
         List<UsageStats> usageStatsList =
@@ -842,7 +820,7 @@ public class PrivacyShadeService extends Service {
                 Logger.d("Usage stats:" + usageStats.getPackageName());
             }
         }
-    }
+    }*/
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -865,7 +843,16 @@ public class PrivacyShadeService extends Service {
                     isRunning = false;
                     stopSelf();
                     ServiceBootstrap.stopAlwaysOnService(this);
-                } /*else if (intent.getAction().equals(Constants.PAUSEFOREGROUND_ACTION)) {
+                } else if (intent.getAction().equals(Constants.CALLRECEIVED_ACTION)) {
+                    Logger.d("Call received in service");
+                    privacyShadeParams.alpha = 0.2f;
+                    windowManager.updateViewLayout(privacyShadeView, privacyShadeParams);
+                } else if (intent.getAction().equals(Constants.CALLENDED_ACTION)) {
+                    Logger.d("Call ended in service");
+                    privacyShadeParams.alpha = getDefaultOpacity();
+                    windowManager.updateViewLayout(privacyShadeView, privacyShadeParams);
+                }
+                /*else if (intent.getAction().equals(Constants.PAUSEFOREGROUND_ACTION)) {
                     Logger.d("Lockscreen activated, service shutting down");
                     isRunning = false;
                     saveCoordinates(getShapeType());

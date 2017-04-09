@@ -14,6 +14,8 @@ public class Constants {
     public static String RESUMEFOREGROUND_ACTION = "com.sand5.privacyscreen.action.resumeforeground";
     public static String STOPFOREGROUND_ACTION = "com.sand5.privacyscreen.action.stopforeground";
     public static String PAUSEFOREGROUND_ACTION = "com.sand5.privacyscreen.action.pauseforeground";
+    public static String CALLRECEIVED_ACTION = "com.sand5.privacyscreen.action.callreceived";
+    public static String CALLENDED_ACTION = "com.sand5.privacyscreen.action.callended";
     public static int FOREGROUND_SERVICE_NOTIFICATION_ID = 101;
 
 }

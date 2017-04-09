@@ -14,7 +14,7 @@ import com.squareup.otto.Bus;
 
 import java.util.Date;
 
-public class PhoneStateReceiver extends BroadcastReceiver {
+public class PhoneCallStateReceiver extends BroadcastReceiver {
 
     private static int lastState = TelephonyManager.CALL_STATE_IDLE;
     private static Date callStartTime;
@@ -22,7 +22,7 @@ public class PhoneStateReceiver extends BroadcastReceiver {
     private static String savedNumber;
     private Bus bus;
 
-    public PhoneStateReceiver() {
+    public PhoneCallStateReceiver() {
         Logger.d("Into phone state constructor");
         bus = PrivacyScreenApplication.bus;
     }

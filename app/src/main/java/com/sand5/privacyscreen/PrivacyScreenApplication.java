@@ -28,6 +28,10 @@ public class PrivacyScreenApplication extends Application {
         preferences = PreferenceManager.getDefaultSharedPreferences(this);
     }
 
+    public Bus getBus() {
+        return bus;
+    }
+
     public SharedPreferences getSharedPreferences() {
         return this.preferences;
     }
