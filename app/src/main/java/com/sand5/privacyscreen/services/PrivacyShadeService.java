@@ -4,8 +4,12 @@ package com.sand5.privacyscreen.services;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.app.usage.UsageStats;
+import android.app.usage.UsageStatsManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -18,7 +22,9 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
+import android.os.Build;
 import android.os.IBinder;
+import android.support.annotation.RequiresApi;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.view.animation.FastOutSlowInInterpolator;
 import android.support.v7.app.NotificationCompat;
@@ -36,14 +42,23 @@ import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 
 import com.orhanobut.logger.Logger;
+import com.sand5.privacyscreen.PrivacyScreenApplication;
 import com.sand5.privacyscreen.R;
+import com.sand5.privacyscreen.events.OnPhoneIdleEvent;
+import com.sand5.privacyscreen.events.OnPhoneReceivedEvent;
+import com.sand5.privacyscreen.events.OnScreenLockEvent;
+import com.sand5.privacyscreen.events.OnScreenUnLockEvent;
+import com.sand5.privacyscreen.receivers.ScreenLockReceiver;
 import com.sand5.privacyscreen.utils.Constants;
 import com.sand5.privacyscreen.utils.ServiceBootstrap;
 import com.sand5.privacyscreen.utils.VisibleToggleClickListener;
+import com.squareup.otto.Bus;
+import com.squareup.otto.Subscribe;
 import com.transitionseverywhere.Fade;
 import com.transitionseverywhere.Transition;
 import com.transitionseverywhere.TransitionManager;
 
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -53,13 +68,13 @@ import static com.sand5.privacyscreen.utils.DisplayUtils.pxToDp;
 
 public class PrivacyShadeService extends Service {
 
-    // TODO: 4/2/17 Enable pinch to zoom
-    // TODO: 4/7/17 Save preferences
-    // FIXME: 4/7/17 Flicker on pixel C on phone calls
+    // TODO: 4/2/17 Enable pinch to zoom (from feedback)
+    // TODO: 4/7/17 Save preferences (coordinates when unlocked)
     // TODO: 4/7/17 Remove lag on dragging
-    // FIXME: 4/7/17 Start service only once from app drawer
-    // FIXME: 4/7/17 Change notification when launched from app drawer
     // TODO: 4/7/17 Handle screen lock/unlock, call received use-cases
+    // TODO: 4/8/17 Rounded icons
+    // TODO: 4/8/17 Add landscape mode
+    // TODO: 4/8/17 Add Pulling indicators
 
     static final int REFRESH_RATE = 5;
     public static boolean isRunning = false;
@@ -69,6 +84,11 @@ public class PrivacyShadeService extends Service {
     int circleViewDestinationX;
     int circleViewDestinationY;
     int counter = 0;
+    int[] bottomLineLocation = new int[2];
+    int[] topLineLocation = new int[2];
+    int[] circleLocation = new int[2];
+    int[] circlePullLocation = new int[2];
+    int topLineX, topLineY, bottomLineX, bottomLineY, circleX, circleY, circlePullX, circlePullY;
     private int screenHeight;
     private int screenWidth;
     private WindowManager windowManager;
@@ -240,11 +260,10 @@ public class PrivacyShadeService extends Service {
     };
     private int defaultCircleRadius = dpToPx(150);
     private RelativeLayout circlePullView;
+    private int numberOfFingers;
+    private int x_cord_Destination;
+    private int y_cord_Destination;
     View.OnTouchListener circleEyeTouchListener = new View.OnTouchListener() {
-
-        int numberOfFingers;
-        int x_cord_Destination, y_cord_Destination;
-
         @Override
         public boolean onTouch(View v, MotionEvent event) {
             numberOfFingers = event.getPointerCount();
@@ -254,11 +273,8 @@ public class PrivacyShadeService extends Service {
             int x_cord = (int) event.getRawX();
             int y_cord = (int) event.getRawY();
 
-
             switch (event.getAction() & MotionEvent.ACTION_MASK) {
-
                 case MotionEvent.ACTION_DOWN:
-
                     x_init_cord = x_cord;
                     y_init_cord = y_cord;
 
@@ -278,7 +294,6 @@ public class PrivacyShadeService extends Service {
 
                     circleViewDestinationX = circleViewMarginX + x_diff_move;
                     circleViewDestinationY = circleViewMarginY + y_diff_move;
-
 
                     circlePullViewParams.x = x_cord_Destination;
                     circlePullViewParams.y = y_cord_Destination;
@@ -312,17 +327,55 @@ public class PrivacyShadeService extends Service {
             return true;
         }
     };
+    private ImageButton toggleCircleButton;
     private ShapeType shapeType;
+    private BroadcastReceiver screenLockReceiver;
+    private boolean isResuming = false;
+    private boolean isClosedBeforeLock = false;
 
     @SuppressWarnings("deprecation")
     @Override
     public void onCreate() {
         super.onCreate();
+        Bus bus = PrivacyScreenApplication.bus;
+        bus.register(this);
         Logger.d("PrivacyShadeService.onCreate()");
+        preferences = PrivacyScreenApplication.getInstance().getSharedPreferences();
+    }
+
+    private void saveCoordinates(ShapeType shapeType) {
+        Logger.d("Screen is locking, saving coordinates!");
+        switch (shapeType) {
+            case RECTANGLE:
+                topLineView.getLocationOnScreen(topLineLocation);
+                topLineX = topLineLocation[0];
+                topLineY = topLineLocation[1];
+                bottomLineView.getLocationOnScreen(bottomLineLocation);
+                bottomLineX = bottomLineLocation[0];
+                bottomLineY = bottomLineLocation[1];
+                preferences.edit().putInt("transparentRectangleTop", transparentRect.top).apply();
+                preferences.edit().putInt("transparentRectangleBottom", transparentRect.bottom).apply();
+                preferences.edit().putInt("topLineCoordinateX", topLineX).apply();
+                preferences.edit().putInt("topLineCoordinateY", topLineY).apply();
+                preferences.edit().putInt("bottomLineCoordinateX", bottomLineX).apply();
+                preferences.edit().putInt("bottomLineCoordinateY", bottomLineY).apply();
+                break;
+            case CIRCLE:
+                circleView.getLocationOnScreen(circleLocation);
+                circlePullView.getLocationOnScreen(circlePullLocation);
+                circleX = circleLocation[0];
+                circleY = circleLocation[1];
+                circlePullX = circlePullLocation[0];
+                circlePullY = circlePullLocation[1];
+                preferences.edit().putInt("circleX", circleX).apply();
+                preferences.edit().putInt("circleY", circleY).apply();
+                preferences.edit().putInt("circlePullX", circleX).apply();
+                preferences.edit().putInt("circlePullY", circleY).apply();
+                break;
+        }
     }
 
     private void handleStart() {
-
         /*
         Initial configuration of everything
          */
@@ -333,18 +386,45 @@ public class PrivacyShadeService extends Service {
         screenHeight = displayMetrics.heightPixels;
         screenWidth = displayMetrics.widthPixels;
         defaultShadeColor = ContextCompat.getColor(getApplicationContext(), R.color.black);
-        setDefaultOpacity(0.5f);
+        if (!preferences.contains("opacity")) {
+            setDefaultOpacity(0.5f);
+            preferences.edit().putFloat("opacity", 0.5f).apply();
+        } else {
+            setDefaultOpacity(preferences.getFloat(("opacity"), 0.5f));
+        }
+
         createDefaultPrivacyShade();
         addPrivacyShade();
-        //addTransparentCircle();
-        addTransparentRectangle();
         addPrivacyShadeMenu();
+        String shapeType;
+        if (!preferences.contains("shape")) {
+            addTransparentRectangle();
+        } else {
+            shapeType = preferences.getString("shape", "rectangle");
+            if (shapeType.equals("rectangle")) {
+                addTransparentRectangle();
+            } else {
+                addTransparentCircle();
+            }
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP_MR1) {
+            collectAppUsageData();
+        }
+        setUpScreenLockReceiver();
     }
 
     private void createDefaultPrivacyShade() {
-        int topLeft = (screenHeight / 2) - defaultRectangleHeight / 2;
-        int bottomRight = (screenHeight / 2) + defaultRectangleHeight / 2;
-        int defaultRectangleTop = 0;
+
+        int topLeft, bottomRight, defaultRectangleTop;
+
+        if (isResuming) {
+            topLeft = preferences.getInt("transparentRectangleTop", 330);
+            bottomRight = preferences.getInt("transparentRectangleBottom", 630);
+        } else {
+            topLeft = (screenHeight / 2) - defaultRectangleHeight / 2;
+            bottomRight = (screenHeight / 2) + defaultRectangleHeight / 2;
+        }
+        defaultRectangleTop = 0;
         transparentRect = new Rect(defaultRectangleTop, topLeft, screenWidth, bottomRight);
         transparentPaint = new Paint();
         transparentPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC));
@@ -360,8 +440,7 @@ public class PrivacyShadeService extends Service {
     private void addPrivacyShade() {
         privacyShadeView = (RelativeLayout) inflater.inflate(R.layout.layout_privacy_screen, null);
         szWindow.set(screenWidth, screenHeight);
-
-		/*
+        /*
         Underlying touches are supported by TYPE_SYSTEM_OVERLAY and not by TYPE_PHONE
 		 */
         privacyShadeParams = new WindowManager.LayoutParams(
@@ -377,16 +456,20 @@ public class PrivacyShadeService extends Service {
 
     private void addTransparentRectangle() {
         setShapeType(ShapeType.RECTANGLE);
+        preferences.edit().putString("shape", "rectangle").apply();
         /*
         Punch a transparent rectangle into the privacy shade
          */
         privacyShadeCanvas.drawRect(transparentRect, transparentPaint);
         privacyShadeView.setBackground(bitmapDrawable);
+        toggleCircleButton.setImageResource(R.drawable.ic_panorama_fish_eye_white_24dp);
 
-        int top = transparentRect.top;
-        int left = transparentRect.left;
-        int bottom = transparentRect.bottom;
-        int right = transparentRect.right;
+        int top, left, bottom, right;
+
+        top = transparentRect.top;
+        left = transparentRect.left;
+        bottom = transparentRect.bottom;
+        right = transparentRect.right;
 
         /*Logger.d("Transparent Rectangle Top: " + top);
         Logger.d("Transparent Rectangle Left: " + left);
@@ -466,13 +549,14 @@ public class PrivacyShadeService extends Service {
         menuParams.gravity = Gravity.TOP | Gravity.END;
 
         ImageButton removeShadeButton = (ImageButton) menuView.findViewById(R.id.button_close_privacy_screen);
-        final ImageButton toggleCircleButton = (ImageButton) menuView.findViewById(R.id.toggle_circle_imageButton);
+        toggleCircleButton = (ImageButton) menuView.findViewById(R.id.toggle_circle_imageButton);
         ImageButton toggleRectangleButton = (ImageButton) menuView.findViewById(R.id.toggle_rectangle_imageButton);
         ImageButton toggleBrightnessSeekBarButton = (ImageButton) menuView.findViewById(R.id.toggle_brightness_imageButton);
 
         removeShadeButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                isClosedBeforeLock = true;
                 stopSelf();
             }
         });
@@ -496,11 +580,11 @@ public class PrivacyShadeService extends Service {
                 switch (getShapeType()) {
                     case CIRCLE:
                         changeShape(ShapeType.RECTANGLE);
-                        toggleCircleButton.setImageResource(R.drawable.ic_crop_5_4_white_24dp);
+                        toggleCircleButton.setImageResource(R.drawable.ic_panorama_fish_eye_white_24dp);
                         break;
                     case RECTANGLE:
                         changeShape(ShapeType.CIRCLE);
-                        toggleCircleButton.setImageResource(R.drawable.ic_panorama_fish_eye_white_24dp);
+                        toggleCircleButton.setImageResource(R.drawable.ic_crop_5_4_white_24dp);
                         break;
                 }
             }
@@ -524,6 +608,8 @@ public class PrivacyShadeService extends Service {
 
     private void addTransparentCircle() {
         setShapeType(ShapeType.CIRCLE);
+        toggleCircleButton.setImageResource(R.drawable.ic_crop_5_4_white_24dp);
+        preferences.edit().putString("shape", "circle").apply();
         circleView = (RelativeLayout) inflater.inflate(R.layout.layout_circle, null);
         WindowManager.LayoutParams circleViewParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
@@ -612,15 +698,18 @@ public class PrivacyShadeService extends Service {
         SeekBar brightnessSeekBar = (SeekBar) brightnessSeekBarView.findViewById(R.id.brightness_seekbar);
         brightnessSeekBar.setMax(maximumDefaultBrightness);
 
-        int progressBar = Math.round(getDefaultOpacity() * 100);
+        Logger.d("Default opacity: " + getDefaultOpacity());
+        int progressBar = 100 - Math.round(getDefaultOpacity() * 100);
+        Logger.d("seekBar opacity: " + progressBar);
 
-        brightnessSeekBar.setProgress(progressBar
-        );
+        brightnessSeekBar.setProgress(progressBar);
         brightnessSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 setDefaultOpacity((float) (100 - progress) / 100);
                 float opacity = (float) (100 - progress) / 100;
+                Logger.d("Opacity that is put in preferences: " + opacity);
+                preferences.edit().putFloat("opacity", opacity).apply();
                 //Logger.d("On Progress Changed: " + opacity);
                 privacyShadeParams.alpha = opacity;
                 windowManager.updateViewLayout(privacyShadeView, privacyShadeParams);
@@ -637,6 +726,56 @@ public class PrivacyShadeService extends Service {
             }
         });
         windowManager.addView(brightnessSeekBarView, seekBarParams);
+    }
+
+    @Subscribe
+    public void hideScreen(OnScreenLockEvent onScreenLockEvent) {
+        Logger.d("Screen Locked Otto");
+        privacyShadeView.setVisibility(View.GONE);
+        menuView.setVisibility(View.GONE);
+        switch (getShapeType()) {
+            case RECTANGLE:
+                bottomLineView.setVisibility(View.GONE);
+                topLineView.setVisibility(View.GONE);
+
+                break;
+            case CIRCLE:
+                circleView.setVisibility(View.GONE);
+                circlePullView.setVisibility(View.GONE);
+                seekbarHolderLayout.setVisibility(View.GONE);
+                break;
+        }
+    }
+
+    @Subscribe
+    public void showScreen(OnScreenUnLockEvent onScreenUnLockEvent) {
+        Logger.d("Screen Unlocked Otto");
+        privacyShadeView.setVisibility(View.VISIBLE);
+        menuView.setVisibility(View.VISIBLE);
+        switch (getShapeType()) {
+            case RECTANGLE:
+                bottomLineView.setVisibility(View.VISIBLE);
+                topLineView.setVisibility(View.VISIBLE);
+                break;
+            case CIRCLE:
+                circleView.setVisibility(View.VISIBLE);
+                circlePullView.setVisibility(View.VISIBLE);
+                break;
+        }
+    }
+
+    @Subscribe
+    public void onPhoneCallReceived(OnPhoneReceivedEvent onPhoneReceivedEvent) {
+        Logger.d("On Call Received Otto");
+        privacyShadeParams.alpha = 0.2f;
+        windowManager.updateViewLayout(privacyShadeView, privacyShadeParams);
+    }
+
+    @Subscribe
+    public void onPhoneIdle(OnPhoneIdleEvent onPhoneIdleEvent) {
+        Logger.d("On Call idle Otto");
+        privacyShadeParams.alpha = getDefaultOpacity();
+        windowManager.updateViewLayout(privacyShadeView, privacyShadeParams);
     }
 
     private void changeShape(ShapeType shapeType) {
@@ -681,36 +820,77 @@ public class PrivacyShadeService extends Service {
         privacyShadeBitmap.eraseColor(ContextCompat.getColor(getApplicationContext(), R.color.black));
     }
 
+    private void setUpScreenLockReceiver() {
+        IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_ON);
+        filter.addAction(Intent.ACTION_SCREEN_OFF);
+        filter.addAction(Intent.ACTION_ANSWER);
+        filter.addAction(Intent.ACTION_USER_PRESENT);
+        screenLockReceiver = new ScreenLockReceiver();
+        registerReceiver(screenLockReceiver, filter);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP_MR1)
+    private void collectAppUsageData() {
+        UsageStatsManager usageStatsManager = (UsageStatsManager) getSystemService(Context.USAGE_STATS_SERVICE);
+        List<UsageStats> usageStatsList =
+                usageStatsManager.queryUsageStats(
+                        UsageStatsManager.INTERVAL_DAILY,
+                        System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1),
+                        System.currentTimeMillis() + TimeUnit.DAYS.toMillis(1));
+        for (UsageStats usageStats : usageStatsList) {
+            if (usageStats.getTotalTimeInForeground() > 0) {
+                Logger.d("Usage stats:" + usageStats.getPackageName());
+            }
+        }
+    }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Logger.d("PrivacyShadeService.onStartCommand()");
         if (intent != null) {
-            Logger.d("Intent is not null");
+            //Logger.d("Intent is not null");
             if (intent.getAction() != null) {
-                Logger.d("Intent action is not null");
+                //Logger.d("Intent action is not null");
                 if (intent.getAction().equals(Constants.STARTFOREGROUND_ACTION)) {
+                    isResuming = false;
                     handleStart();
+                    startForegroundService();
                     if (!isRunning) {
                         ScheduledExecutorService backgroundService = Executors.newSingleThreadScheduledExecutor();
                         backgroundService.scheduleAtFixedRate(new TimerIncreasedRunnable(
                                 this), 0, 1000, TimeUnit.MILLISECONDS);
                         isRunning = true;
                     }
-                    startForegroundService();
                 } else if (intent.getAction().equals(Constants.STOPFOREGROUND_ACTION)) {
-                    //Stop the service
                     isRunning = false;
                     stopSelf();
                     ServiceBootstrap.stopAlwaysOnService(this);
-                }
+                } /*else if (intent.getAction().equals(Constants.PAUSEFOREGROUND_ACTION)) {
+                    Logger.d("Lockscreen activated, service shutting down");
+                    isRunning = false;
+                    saveCoordinates(getShapeType());
+                    stopSelf();
+                    ServiceBootstrap.stopAlwaysOnService(this);
+                }else if (intent.getAction().equals(Constants.RESUMEFOREGROUND_ACTION)) {
+                    Logger.d("Resuming from lockscreen");
+                    isResuming = true;
+                    handleStart();
+                    startForegroundService();
+                    if (!isRunning) {
+                        ScheduledExecutorService backgroundService = Executors.newSingleThreadScheduledExecutor();
+                        backgroundService.scheduleAtFixedRate(new TimerIncreasedRunnable(
+                                this), 0, 1000, TimeUnit.MILLISECONDS);
+                        isRunning = true;
+                    }
+                }*/
             }
         }
         return START_STICKY;
     }
 
+
     // Run service in foreground so it is less likely to be killed by system
     private void startForegroundService() {
-
         Intent stopServiceIntent = new Intent(this, PrivacyShadeService.class);
         stopServiceIntent.setAction(Constants.STOPFOREGROUND_ACTION);
         PendingIntent stopServicePendingIntent = PendingIntent.getService(this, 0, stopServiceIntent, PendingIntent.FLAG_CANCEL_CURRENT);
@@ -761,8 +941,11 @@ public class PrivacyShadeService extends Service {
         Logger.d("PrivacyShadeService.onStop, starting notification service");
         Intent startServiceIntent = new Intent(Constants.STARTFOREGROUND_ACTION);
         startServiceIntent.setClass(this, PersistentNotificationService.class);
+        startServiceIntent.putExtra("isClosedBeforeLocking", isClosedBeforeLock);
         startServiceIntent.setAction(Constants.STARTFOREGROUND_ACTION);
         startService(startServiceIntent);
+
+        unregisterReceiver(screenLockReceiver);
     }
 
     @Override
@@ -815,6 +998,6 @@ public class PrivacyShadeService extends Service {
             this.currentSharedPreferences.edit().putInt(
                     Constants.SHAREDPREF_RUNNINGTIMECOUNT_STRING,
                     timeCount).apply();
-        }
+    }
     }
 }

@@ -25,6 +25,7 @@ public class PersistentNotificationService extends Service {
     private final String TAG = "NotificationService";
     private boolean isRunning = false;
 
+
     public PersistentNotificationService() {
     }
 
@@ -81,7 +82,6 @@ public class PersistentNotificationService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-
         Logger.d("NotificationService.onStop, starting privacy shade service");
         Intent startServiceIntent = new Intent(Constants.STARTFOREGROUND_ACTION);
         startServiceIntent.setClass(this, PrivacyShadeService.class);

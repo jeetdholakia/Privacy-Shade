@@ -8,7 +8,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 
 import com.sand5.privacyscreen.receivers.AlarmBroadcastReceiver;
-import com.sand5.privacyscreen.receivers.PhoneBootReceiver;
+import com.sand5.privacyscreen.receivers.ScreenLockReceiver;
 import com.sand5.privacyscreen.services.PrivacyShadeService;
 
 import java.util.Calendar;
@@ -71,7 +71,7 @@ public class ServiceBootstrap {
         int flag = (isEnabled ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
                 : PackageManager.COMPONENT_ENABLED_STATE_DISABLED);
         ComponentName component = new ComponentName(context,
-                PhoneBootReceiver.class);
+                ScreenLockReceiver.class);
 
         context.getPackageManager().setComponentEnabledSetting(component, flag,
                 PackageManager.DONT_KILL_APP);

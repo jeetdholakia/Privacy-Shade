@@ -1,0 +1,42 @@
+{
+  "project_info": {
+    "project_number": "368157908657",
+    "firebase_url": "https://privacy-screen.firebaseio.com",
+    "project_id": "privacy-screen",
+    "storage_bucket": "privacy-screen.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:368157908657:android:a76e851b47b10c12",
+        "android_client_info": {
+          "package_name": "com.sand5.privacyscreen"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "368157908657-vjfdgp6f1hqf4ku1lh5jr3ktb0p07r4o.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBVZowypiPcEAqcpCaF9u1_lhUW0G2BLAo"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
