@@ -1,13 +1,9 @@
 package com.sand5.privacyscreen.utils;
 
-/**
- * Created by jeetdholakia on 4/6/17.
- */
-
 public class Dump {
 
-    /**
-     * Dumping grounds for code that might be useful in future
+    /*
+      Dumping grounds for code that might be useful in future
      */
 
     /*
@@ -358,6 +354,38 @@ public class Dump {
             rectangleView.setPivotX(newX);
             rectangleView.setPivotY(newY);
 
+        }
+    }
+
+    void saveCoordinates(ShapeType shapeType) {
+        Logger.d("Screen is locking, saving coordinates!");
+        switch (shapeType) {
+            case RECTANGLE:
+                topLineView.getLocationOnScreen(topLineLocation);
+                topLineX = topLineLocation[0];
+                topLineY = topLineLocation[1];
+                bottomLineView.getLocationOnScreen(bottomLineLocation);
+                bottomLineX = bottomLineLocation[0];
+                bottomLineY = bottomLineLocation[1];
+                preferences.edit().putInt("transparentRectangleTop", transparentRect.top).apply();
+                preferences.edit().putInt("transparentRectangleBottom", transparentRect.bottom).apply();
+                preferences.edit().putInt("topLineCoordinateX", topLineX).apply();
+                preferences.edit().putInt("topLineCoordinateY", topLineY).apply();
+                preferences.edit().putInt("bottomLineCoordinateX", bottomLineX).apply();
+                preferences.edit().putInt("bottomLineCoordinateY", bottomLineY).apply();
+                break;
+            case CIRCLE:
+                circleView.getLocationOnScreen(circleLocation);
+                circlePullView.getLocationOnScreen(circlePullLocation);
+                circleX = circleLocation[0];
+                circleY = circleLocation[1];
+                circlePullX = circlePullLocation[0];
+                circlePullY = circlePullLocation[1];
+                preferences.edit().putInt("circleX", circleX).apply();
+                preferences.edit().putInt("circleY", circleY).apply();
+                preferences.edit().putInt("circlePullX", circleX).apply();
+                preferences.edit().putInt("circlePullY", circleY).apply();
+                break;
         }
     }
 

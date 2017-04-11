@@ -5,8 +5,8 @@
 
     <ImageView
         android:id="@+id/circle_pull_imageView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:padding="32dp"
-        android:src="@drawable/ic_visibility_white_24dp" />
+        android:layout_width="40dp"
+        android:layout_height="20dp"
+        android:background="@drawable/semicircle_top"
+        android:src="@drawable/ic_drag_handle_black_24dp" />
 </RelativeLayout>

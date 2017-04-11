@@ -14,4 +14,6 @@
     <color name="blue_A2E5F5">#A2E5F5</color>
     <color name="black">#000000</color>
     <color name="grey_500">#9E9E9E</color>
+    <color name="grey_600">#757575</color>
+    <color name="grey_700">#616161</color>
 </resources>

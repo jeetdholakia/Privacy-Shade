@@ -9,6 +9,7 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -26,7 +27,7 @@ import com.sand5.privacyscreen.utils.Utils;
 public class MainActivity extends AppCompatActivity {
 
     final private static int PERMISSION_PRIVACY_SHADE_OVERLAY = 501;
-    final private static int PERMISSION_USAGE_STATISTICS = 502;
+    //final private static int PERMISSION_USAGE_STATISTICS = 502;
     private static final int MY_PERMISSIONS_REQUEST_READ_PHONE_STATE = 503;
 
     @Override
@@ -83,6 +84,7 @@ public class MainActivity extends AppCompatActivity {
         } else {
             if (Utils.canDrawOverlays(MainActivity.this)) {
                 startPrivacyShadeService();
+
             /*if (hasUsageStatisticsPermission()) {
                 startPrivacyShadeService();
             } else {
@@ -146,11 +148,11 @@ public class MainActivity extends AppCompatActivity {
         startActivityForResult(intent, requestCode);
     }
 
-    private void requestUsagePermission(int requestCode) {
+    /*private void requestUsagePermission(int requestCode) {
         startActivityForResult(
                 new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS),
                 requestCode);
-    }
+    }*/
 
     private boolean isMyServiceRunning(Class<?> serviceClass) {
         ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
@@ -190,7 +192,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onRequestPermissionsResult(int requestCode,
-                                           String permissions[], int[] grantResults) {
+                                           @NonNull String permissions[], @NonNull int[] grantResults) {
         switch (requestCode) {
             case MY_PERMISSIONS_REQUEST_READ_PHONE_STATE: {
                 // If request is cancelled, the result arrays are empty.

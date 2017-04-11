@@ -10,21 +10,24 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.PROCESS_OUTGOING_CALLS" />
 
-    <!-- <uses-permission
+    <!--
+     <uses-permission
        android:name="android.permission.PACKAGE_USAGE_STATS"
-       tools:ignore="ProtectedPermissions" /> -->
-
-    <!-- <permission
+       tools:ignore="ProtectedPermissions" />
+    -->
+    <!--
+ <permission
         android:name="com.sand5.permission.NOTIFICATIONS"
         android:label="Notifications"
-        android:protectionLevel="dangerous" /> -->
-
-    <!-- <uses-permission android:name="com.sand5.permission.NOTIFICATIONS" />  -->
+        android:protectionLevel="dangerous" />
+    -->
+    <!-- <uses-permission android:name="com.sand5.permission.NOTIFICATIONS" /> -->
 
 
     <application
         android:name=".PrivacyScreenApplication"
         android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_descriptor"
         android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -35,12 +38,7 @@
             android:name=".activities.MainActivity"
             android:excludeFromRecents="true"
             android:launchMode="singleTask">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
         </activity>
-
 
         <service
             android:name=".services.PrivacyShadeService"
@@ -82,7 +80,7 @@
             </intent-filter>
         </receiver>
 
-        <!--This part is inside the application-->
+        <!-- This part is inside the application -->
         <receiver
             android:name=".receivers.CallReceiver"
             android:enabled="true">
@@ -91,6 +89,18 @@
             </intent-filter>
         </receiver>
 
+        <activity
+            android:name=".activities.OnBoardingActivity"
+            android:excludeFromRecents="true"
+            android:label="@string/app_name"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
     </application>
 
 </manifest>

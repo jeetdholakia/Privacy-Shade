@@ -1,7 +1,9 @@
 package com.sand5.privacyscreen.receivers;
 
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
+import android.util.Log;
 
 import com.orhanobut.logger.Logger;
 import com.sand5.privacyscreen.services.PrivacyShadeService;
@@ -14,10 +16,11 @@ public class CallReceiver extends PhoneCallReceiver {
     @Override
     protected void onIncomingCallReceived(Context ctx, String number, Date start) {
         Logger.d("Incoming call received");
-        Intent stopServiceIntent = new Intent(ctx, PrivacyShadeService.class);
-        stopServiceIntent.setAction(Constants.CALLRECEIVED_ACTION);
-        ctx.startService(stopServiceIntent);
-
+        if (isMyServiceRunning(PrivacyShadeService.class, ctx)) {
+            Intent stopServiceIntent = new Intent(ctx, PrivacyShadeService.class);
+            stopServiceIntent.setAction(Constants.CALLRECEIVED_ACTION);
+            ctx.startService(stopServiceIntent);
+        }
     }
 
     @Override
@@ -28,10 +31,11 @@ public class CallReceiver extends PhoneCallReceiver {
     @Override
     protected void onIncomingCallEnded(Context ctx, String number, Date start, Date end) {
         Logger.d("Incoming call ended");
-        Intent stopServiceIntent = new Intent(ctx, PrivacyShadeService.class);
-        stopServiceIntent.setAction(Constants.CALLENDED_ACTION);
-        ctx.startService(stopServiceIntent);
-
+        if (isMyServiceRunning(PrivacyShadeService.class, ctx)) {
+            Intent stopServiceIntent = new Intent(ctx, PrivacyShadeService.class);
+            stopServiceIntent.setAction(Constants.CALLENDED_ACTION);
+            ctx.startService(stopServiceIntent);
+        }
     }
 
     @Override
@@ -47,9 +51,23 @@ public class CallReceiver extends PhoneCallReceiver {
     @Override
     protected void onMissedCall(Context ctx, String number, Date start) {
         Logger.d("Missed Call");
-        Intent stopServiceIntent = new Intent(ctx, PrivacyShadeService.class);
-        stopServiceIntent.setAction(Constants.CALLENDED_ACTION);
-        ctx.startService(stopServiceIntent);
+        if (isMyServiceRunning(PrivacyShadeService.class, ctx)) {
+            Intent stopServiceIntent = new Intent(ctx, PrivacyShadeService.class);
+            stopServiceIntent.setAction(Constants.CALLENDED_ACTION);
+            ctx.startService(stopServiceIntent);
+        }
+    }
+
+    private boolean isMyServiceRunning(Class<?> serviceClass, Context context) {
+        ActivityManager manager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (serviceClass.getName().equals(service.service.getClassName())) {
+                Log.i("Service already", "running");
+                return true;
+            }
+        }
+        Log.i("Service not", "running");
+        return false;
     }
 
 }

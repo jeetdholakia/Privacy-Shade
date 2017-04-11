@@ -13,10 +13,6 @@ import com.orhanobut.logger.Logger;
 
 import java.util.ArrayList;
 
-/**
- * Created by jeetdholakia on 4/6/17.
- */
-
 public class DisplayUtils {
 
     public static int getStatusBarHeight(Context context) {
