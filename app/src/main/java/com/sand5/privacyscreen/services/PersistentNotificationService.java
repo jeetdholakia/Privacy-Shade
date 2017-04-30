@@ -12,6 +12,7 @@ import android.util.Log;
 
 import com.orhanobut.logger.Logger;
 import com.sand5.privacyscreen.R;
+import com.sand5.privacyscreen.activities.MainActivity;
 import com.sand5.privacyscreen.utils.Constants;
 import com.sand5.privacyscreen.utils.ServiceBootstrap;
 
@@ -83,10 +84,8 @@ public class PersistentNotificationService extends Service {
     public void onDestroy() {
         super.onDestroy();
         Logger.d("NotificationService.onStop, starting privacy shade service");
-        Intent startServiceIntent = new Intent(Constants.STARTFOREGROUND_ACTION);
-        startServiceIntent.setClass(this, PrivacyShadeService.class);
-        startServiceIntent.setAction(Constants.STARTFOREGROUND_ACTION);
-        startService(startServiceIntent);
+        Intent startServiceIntent = new Intent(this, MainActivity.class);
+        startActivity(startServiceIntent);
     }
 
     @Override

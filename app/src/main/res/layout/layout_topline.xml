@@ -3,8 +3,9 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
+
     <ImageView
-        android:id="@+id/mainLine_imageView"
+        android:id="@+id/topLine_imageView"
         android:layout_width="match_parent"
         android:layout_height="5dp"
         android:layout_alignParentBottom="true"
@@ -12,12 +13,24 @@
         android:background="@color/white" />
 
     <ImageView
-        android:id="@+id/mainLine_semiCircleView"
+        android:id="@+id/topLine_dragLineView"
         android:layout_width="40dp"
         android:layout_height="20dp"
-        android:layout_above="@id/mainLine_imageView"
+        android:layout_above="@id/topLine_imageView"
         android:layout_alignParentEnd="true"
         android:layout_marginEnd="16dp"
         android:background="@drawable/semicircle_top"
         android:src="@drawable/ic_drag_handle_black_24dp" />
+
+    <ImageView
+        android:id="@+id/topLine_zoomLineView"
+        android:layout_width="40dp"
+        android:layout_height="20dp"
+        android:layout_above="@id/topLine_imageView"
+        android:layout_alignParentStart="true"
+        android:layout_marginStart="16dp"
+        android:background="@drawable/semicircle_top"
+        android:src="@drawable/ic_keyboard_arrow_up_black_24dp" />
+
+
 </RelativeLayout>

@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/bottomLine_holder"
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
     <ImageView
-        android:id="@+id/mainLine_imageView"
+        android:id="@+id/bottomLine_imageView"
         android:layout_width="match_parent"
         android:layout_height="5dp"
         android:layout_alignParentStart="true"
@@ -12,12 +13,29 @@
         android:background="@color/white" />
 
     <ImageView
+        android:id="@+id/bottomLine_dragLineView"
         android:layout_width="40dp"
         android:layout_height="20dp"
         android:layout_alignParentEnd="true"
-        android:layout_below="@id/mainLine_imageView"
+        android:layout_below="@id/bottomLine_imageView"
         android:layout_marginEnd="16dp"
-        android:background="@drawable/semicircle"
+        android:background="@drawable/semicircle_bottom"
         android:src="@drawable/ic_drag_handle_black_24dp" />
+
+    <ImageView
+        android:id="@+id/bottomLine_zoomLineView"
+        android:layout_width="40dp"
+        android:layout_height="20dp"
+        android:layout_alignParentStart="true"
+        android:layout_below="@id/bottomLine_imageView"
+        android:layout_marginStart="16dp"
+        android:background="@drawable/semicircle_bottom"
+        android:src="@drawable/ic_keyboard_arrow_down_black_24dp" />
+
+    <RelativeLayout
+        android:id="@+id/tooltip_drag_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/bottomLine_zoomLineView"></RelativeLayout>
 
 </RelativeLayout>

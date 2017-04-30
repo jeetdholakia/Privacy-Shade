@@ -1,27 +1,30 @@
 package com.sand5.privacyscreen.activities;
 
+import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.View;
 
-import com.chyrta.onboarder.OnboarderActivity;
-import com.chyrta.onboarder.OnboarderPage;
+import com.google.firebase.analytics.FirebaseAnalytics;
 import com.sand5.privacyscreen.PrivacyScreenApplication;
 import com.sand5.privacyscreen.R;
 
-import java.util.ArrayList;
-import java.util.List;
+import agency.tango.materialintroscreen.MaterialIntroActivity;
+import agency.tango.materialintroscreen.MessageButtonBehaviour;
+import agency.tango.materialintroscreen.SlideFragmentBuilder;
 
-public class OnBoardingActivity extends OnboarderActivity {
+public class OnBoardingActivity extends MaterialIntroActivity {
 
-    List<OnboarderPage> onBoarderPages;
     SharedPreferences preferences;
     boolean isFirstTime;
+    Bundle bundle = new Bundle();
+    private FirebaseAnalytics mFirebaseAnalytics;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        onBoarderPages = new ArrayList<>();
+        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
         preferences = PrivacyScreenApplication.getInstance().getSharedPreferences();
         isFirstTime = preferences.getBoolean("isFirstTime", true);
 
@@ -34,37 +37,52 @@ public class OnBoardingActivity extends OnboarderActivity {
     }
 
     private void showOnBoardingPages() {
-        // Create your first page
-        OnboarderPage onBoarderPage1 = new OnboarderPage("Privacy Screen", "Prevent people from looking at your screen", R.drawable.ic_screen_lock_portrait_white_48dp);
-        OnboarderPage onBoarderPage2 = new OnboarderPage("Total Control", "Select the view area that you can control, while still interacting with full screen", R.drawable.ic_filter_center_focus_white_48dp);
-        OnboarderPage onBoarderPage3 = new OnboarderPage("Turning on and off", "Tap on notification tray to turn the screen on and off", R.drawable.ic_clear_all_white_48dp);
 
-        // You can define title and description colors (by default white)
-        onBoarderPage1.setTitleColor(R.color.white);
-        onBoarderPage1.setDescriptionColor(R.color.white);
-        onBoarderPage1.setTitleTextSize(30);
-        onBoarderPage2.setTitleColor(R.color.white);
-        onBoarderPage2.setDescriptionColor(R.color.white);
-        onBoarderPage2.setTitleTextSize(30);
-        onBoarderPage3.setTitleColor(R.color.white);
-        onBoarderPage3.setDescriptionColor(R.color.white);
-        onBoarderPage3.setTitleTextSize(30);
+        addSlide(new SlideFragmentBuilder()
+                .backgroundColor(R.color.onboarding_blue)
+                .buttonsColor(R.color.colorAccent)
+                .image(R.drawable.onboard22)
+                .title("Privacy Screen Guard")
+                .description("Prevent people from looking at your screen by blocking out everything except a small part of the screen that you control")
+                .build());
 
-        // Don't forget to set background color for your page
-        onBoarderPage1.setBackgroundColor(R.color.grey_700);
-        onBoarderPage2.setBackgroundColor(R.color.grey_700);
-        onBoarderPage3.setBackgroundColor(R.color.grey_700);
 
-        // Add your pages to the list
-        onBoarderPages.add(onBoarderPage1);
-        onBoarderPages.add(onBoarderPage2);
-        onBoarderPages.add(onBoarderPage3);
+        /*addSlide(new SlideFragmentBuilder()
+                .backgroundColor(R.color.onboarding_blue)
+                .buttonsColor(R.color.colorAccent)
+                .image(R.drawable.onboard22)
+                .title("Total Control")
+                .description("Select the view area that you can control, while still interacting with full screen")
+                .build());*/
 
-        this.setSkipButtonHidden();
-        shouldDarkenButtonsLayout(true);
-        setFinishButtonTitle("SETUP SCREEN");
-        // And pass your pages to 'setOnboardPagesReady' method
-        setOnboardPagesReady(onBoarderPages);
+        addSlide(new SlideFragmentBuilder()
+                .backgroundColor(R.color.onboarding_blue)
+                .buttonsColor(R.color.colorAccent)
+                .possiblePermissions(new String[]{Manifest.permission.READ_PHONE_STATE})
+                .image(R.drawable.onboard44)
+                .title("Smart features")
+                .description("Granting this permission hides the privacy shade when calls are received")
+                .build());
+
+
+        addSlide(new SlideFragmentBuilder()
+                .backgroundColor(R.color.onboarding_blue)
+                .buttonsColor(R.color.colorAccent)
+                .image(R.drawable.onboard33)
+                .title("Turning on and off")
+                .description("Tap on notification tray or quick setting tiles to turn the screen on and off")
+                .build(), new MessageButtonBehaviour(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                preferences.edit().putBoolean("isFirstTime", false).apply();
+                bundle.putString("OnBoarding", "OnBoarding completed");
+                mFirebaseAnalytics.logEvent("OnBoarding", bundle);
+                finishActivity();
+            }
+        }, "SETUP"));
+
+
+        enableLastSlideAlphaExitTransition(true);
     }
 
     private void finishActivity() {
@@ -74,8 +92,11 @@ public class OnBoardingActivity extends OnboarderActivity {
     }
 
     @Override
-    public void onFinishButtonPressed() {
+    public void onFinish() {
+        super.onFinish();
         preferences.edit().putBoolean("isFirstTime", false).apply();
+        bundle.putString("OnBoarding", "OnBoarding completed");
+        mFirebaseAnalytics.logEvent("OnBoarding", bundle);
         finishActivity();
     }
 

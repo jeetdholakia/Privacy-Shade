@@ -2,7 +2,7 @@
 <resources>
     <color name="colorPrimary">#3F51B5</color>
     <color name="colorPrimaryDark">#303F9F</color>
-    <color name="colorAccent">#FF4081</color>
+    <color name="colorAccent">#e91e63</color>
     <color name="dark">#000000</color>
     <color name="white">#ffffff</color>
 
@@ -16,4 +16,60 @@
     <color name="grey_500">#9E9E9E</color>
     <color name="grey_600">#757575</color>
     <color name="grey_700">#616161</color>
+    <color name="textColorPrimary">#212121</color>
+    <color name="textColorSecondary">#757575</color>
+
+    <color name="primary">#3F51B5</color>
+    <color name="primary_dark">#303F9F</color>
+    <color name="primary_light">#C5CAE9</color>
+    <color name="accent">#FF4081</color>
+    <color name="primary_text">#212121</color>
+    <color name="secondary_text">#757575</color>
+    <color name="icons">#FFFFFF</color>
+    <color name="divider">#BDBDBD</color>
+
+    <!-- Accent colors for menu bar -->
+    <color name="red_accent">#e53935</color>
+    <color name="pink_accent">#d81b60</color>
+    <color name="purple_accent">#8e24aa</color>
+    <color name="deep_purple_accent">#5e35b1</color>
+    <color name="indigo_accent">#3949ab</color>
+    <color name="blue_accent">#1e88e5</color>
+    <color name="light_blue_accent">#039be5</color>
+    <color name="cyan_accent">#039be5</color>
+    <color name="teal_accent">#039be5</color>
+    <color name="green_accent">#43a047</color>
+    <color name="light_green_accent">#7cb342</color>
+    <color name="lime_accent">#c0ca33</color>
+    <color name="yellow_accent">#fdd835</color>
+    <color name="amber_accent">#ffb300</color>
+    <color name="orange_accent">#fb8c00</color>
+    <color name="deep_orange_accent">#f4511e</color>
+    <color name="brown_accent">#6d4c41</color>
+    <color name="grey_accent">#757575</color>
+    <color name="blue_grey_accent">#546e7a</color>
+    <color name="onboarding_blue">#039be5</color>
+
+
+    <array name="color_choices">
+        <item>@color/red_accent</item>
+        <item>@color/pink_accent</item>
+        <item>@color/purple_accent</item>
+        <item>@color/deep_purple_accent</item>
+        <item>@color/indigo_accent</item>
+        <item>@color/blue_accent</item>
+        <item>@color/light_blue_accent</item>
+        <item>@color/cyan_accent</item>
+        <item>@color/teal_accent</item>
+        <item>@color/green_accent</item>
+        <item>@color/light_green_accent</item>
+        <item>@color/lime_accent</item>
+        <item>@color/yellow_accent</item>
+        <item>@color/amber_accent</item>
+        <item>@color/orange_accent</item>
+        <item>@color/deep_orange_accent</item>
+        <item>@color/brown_accent</item>
+        <item>@color/green_accent</item>
+        <item>@color/blue_grey_accent</item>
+    </array>
 </resources>

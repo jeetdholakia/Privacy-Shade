@@ -5,6 +5,7 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
@@ -18,6 +19,9 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.Toast;
 
+import com.codemybrainsout.ratingdialog.RatingDialog;
+import com.google.firebase.analytics.FirebaseAnalytics;
+import com.sand5.privacyscreen.PrivacyScreenApplication;
 import com.sand5.privacyscreen.R;
 import com.sand5.privacyscreen.services.PrivacyShadeService;
 import com.sand5.privacyscreen.utils.Constants;
@@ -29,12 +33,65 @@ public class MainActivity extends AppCompatActivity {
     final private static int PERMISSION_PRIVACY_SHADE_OVERLAY = 501;
     //final private static int PERMISSION_USAGE_STATISTICS = 502;
     private static final int MY_PERMISSIONS_REQUEST_READ_PHONE_STATE = 503;
+    private FirebaseAnalytics mFirebaseAnalytics;
+    private int numberOfTimesOpened;
+    private SharedPreferences preferences;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        requestPhoneStateAccess();
+        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
+        preferences = PrivacyScreenApplication.getInstance().getSharedPreferences();
+        numberOfTimesOpened = preferences.getInt("timesOpened", 1);
+
+        /*if(numberOfTimesOpened != 3){
+            numberOfTimesOpened++;
+            preferences.edit().putInt("timesOpened",numberOfTimesOpened).apply();
+            requestPhoneStateAccess();
+        }else{
+            numberOfTimesOpened++;
+            preferences.edit().putInt("timesOpened",numberOfTimesOpened).apply();
+            showRatingDialog();
+        }*/
+
+        if (Utils.canDrawOverlays(MainActivity.this)) {
+            startPrivacyShadeService();
+
+            /*if (hasUsageStatisticsPermission()) {
+                startPrivacyShadeService();
+            } else {
+                requestUsagePermission(PERMISSION_USAGE_STATISTICS);
+            }*/
+        } else {
+            requestOverLayPermission(PERMISSION_PRIVACY_SHADE_OVERLAY);
+        }
+
+        //requestPhoneStateAccess();
+
+    }
+
+    private void showRatingDialog() {
+        final RatingDialog ratingDialog = new RatingDialog.Builder(this)
+                .threshold(3)
+                .onRatingBarFormSumbit(new RatingDialog.Builder.RatingDialogFormListener() {
+                    @Override
+                    public void onFormSubmitted(String feedback) {
+                        Intent i = new Intent(Intent.ACTION_SEND);
+                        i.setType("message/rfc822");
+                        i.putExtra(Intent.EXTRA_EMAIL, new String[]{"social@locaholic.co"});
+                        i.putExtra(Intent.EXTRA_SUBJECT, "To Privacy shade developers");
+                        i.putExtra(Intent.EXTRA_TEXT, feedback);
+                        try {
+                            startActivity(Intent.createChooser(i, "Send an e-mail to developer"));
+                        } catch (android.content.ActivityNotFoundException ex) {
+                            Toast.makeText(MainActivity.this, "There are no email clients installed.", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                }).build();
+
+        ratingDialog.show();
     }
 
 
@@ -43,13 +100,8 @@ public class MainActivity extends AppCompatActivity {
                 Manifest.permission.READ_PHONE_STATE)
                 != PackageManager.PERMISSION_GRANTED) {
 
-            // Should we show an explanation?
             if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this,
                     Manifest.permission.READ_PHONE_STATE)) {
-
-                // Show an explanation to the user *asynchronously* -- don't block
-                // this thread waiting for the user's response! After the user
-                // sees the explanation, try again to request the permission.
 
                 Snackbar.make(findViewById(android.R.id.content),
                         "Granting this permission hides the privacy shade when calls are received",
@@ -63,7 +115,6 @@ public class MainActivity extends AppCompatActivity {
                             }
                         }).show();
             } else {
-                // No explanation needed, we can request the permission.
                 ActivityCompat.requestPermissions(MainActivity.this,
                         new String[]{Manifest.permission.READ_PHONE_STATE},
                         MY_PERMISSIONS_REQUEST_READ_PHONE_STATE);
@@ -121,22 +172,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void needPermissionDialog(final int requestCode) {
         AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-        builder.setMessage("You need to allow permission");
-        builder.setPositiveButton("OK",
+        builder.setMessage("You need to allow permission for the app to work");
+        builder.setPositiveButton("ENABLE",
                 new android.content.DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        // TODO Auto-generated method stub
                         requestOverLayPermission(requestCode);
                     }
                 });
-        builder.setNegativeButton("Cancel", new android.content.DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                // TODO Auto-generated method stub
-
-            }
-        });
         builder.setCancelable(false);
         builder.show();
     }
@@ -171,8 +214,14 @@ public class MainActivity extends AppCompatActivity {
         switch (requestCode) {
             case PERMISSION_PRIVACY_SHADE_OVERLAY:
                 if (!Utils.canDrawOverlays(MainActivity.this)) {
+                    Bundle bundle = new Bundle();
+                    bundle.putString("Overlay_Permission", "Overlay Permission not granted");
+                    mFirebaseAnalytics.logEvent("Permissions", bundle);
                     needPermissionDialog(requestCode);
                 } else {
+                    Bundle bundle = new Bundle();
+                    bundle.putString("Overlay_Permission", "Overlay Permission granted");
+                    mFirebaseAnalytics.logEvent("Permissions", bundle);
                     startPrivacyShadeService();
                     /*if (!hasUsageStatisticsPermission()) {
                         requestUsagePermission(PERMISSION_USAGE_STATISTICS);
@@ -198,17 +247,25 @@ public class MainActivity extends AppCompatActivity {
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+                    Bundle bundle = new Bundle();
+                    bundle.putString("Phone_Access_Permission", "Phone Permission granted");
+                    mFirebaseAnalytics.logEvent("Permissions", bundle);
+
                     if (Utils.canDrawOverlays(MainActivity.this)) {
                         startPrivacyShadeService();
-            /*if (hasUsageStatisticsPermission()) {
-                startPrivacyShadeService();
-            } else {
-                requestUsagePermission(PERMISSION_USAGE_STATISTICS);
-            }*/
+                        /*if (hasUsageStatisticsPermission()) {
+                            startPrivacyShadeService();
+                        } else {
+                            requestUsagePermission(PERMISSION_USAGE_STATISTICS);
+                        }*/
                     } else {
                         requestOverLayPermission(PERMISSION_PRIVACY_SHADE_OVERLAY);
                     }
                 } else {
+                    Bundle bundle = new Bundle();
+                    bundle.putString("Phone_Access_Permission", "Phone Permission not granted");
+                    mFirebaseAnalytics.logEvent("Permissions", bundle);
                     Snackbar.make(findViewById(android.R.id.content), "You can enable the permission from settings",
                             Snackbar.LENGTH_INDEFINITE).setAction("ENABLE",
                             new View.OnClickListener() {

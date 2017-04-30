@@ -1,0 +1,48 @@
+<android.support.v7.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--<android.support.v7.preference.PreferenceCategory
+        android:title="@string/pref_header_customize">
+
+        <com.kizitonwose.colorpreferencecompat.ColorPreferenceCompat
+            android:defaultValue="@color/white"
+            android:key="menu_color"
+            android:summary="Color of menubar icons"
+            app:colorChoices="@array/color_choices"
+            android:title="Menubar color" />
+
+        <com.kizitonwose.colorpreferencecompat.ColorPreferenceCompat
+            android:defaultValue="@color/white"
+            android:key="overlay_color"
+            android:summary=""
+            app:colorChoices="@array/color_choices"
+            android:title="Privacy Shade color"/>
+
+        <com.kizitonwose.colorpreferencecompat.ColorPreferenceCompat
+            android:defaultValue="@color/white"
+            android:key="window_color"
+            android:summary="Border color of the window"
+            android:title="Window color"/>
+    </android.support.v7.preference.PreferenceCategory> -->
+
+    <android.support.v7.preference.PreferenceCategory android:title="Settings">
+
+        <android.support.v7.preference.SwitchPreferenceCompat
+            android:id="@+id/notificationSwitch"
+            android:defaultValue="true"
+            android:icon="@drawable/ic_settings_notifications_24dp"
+            android:key="should_show_notification"
+            android:summary="Display active notification to turn the shade on and off"
+            android:title="Active Notification" />
+
+        <android.support.v7.preference.Preference
+            android:icon="@drawable/ic_info_24dp"
+            android:key="account_settings"
+            android:summary=""
+            android:title="About">
+            <intent
+                android:action="AboutActivity"
+                android:targetPackage="com.sand5.privacyscreen" />
+        </android.support.v7.preference.Preference>
+    </android.support.v7.preference.PreferenceCategory>
+
+</android.support.v7.preference.PreferenceScreen>
