@@ -10,6 +10,7 @@ import android.os.IBinder;
 import android.support.v7.app.NotificationCompat;
 import android.util.Log;
 
+import com.google.firebase.crash.FirebaseCrash;
 import com.orhanobut.logger.Logger;
 import com.sand5.privacyscreen.R;
 import com.sand5.privacyscreen.activities.MainActivity;
@@ -84,8 +85,14 @@ public class PersistentNotificationService extends Service {
     public void onDestroy() {
         super.onDestroy();
         Logger.d("NotificationService.onStop, starting privacy shade service");
-        Intent startServiceIntent = new Intent(this, MainActivity.class);
-        startActivity(startServiceIntent);
+        try {
+            Intent startServiceIntent = new Intent(this, MainActivity.class);
+            startServiceIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(startServiceIntent);
+        } catch (RuntimeException exception) {
+            FirebaseCrash.report(exception);
+        }
+
     }
 
     @Override

@@ -54,6 +54,7 @@ import android.widget.SeekBar;
 
 import com.google.android.gms.appinvite.AppInviteInvitation;
 import com.google.firebase.analytics.FirebaseAnalytics;
+import com.google.firebase.crash.FirebaseCrash;
 import com.orhanobut.logger.Logger;
 import com.sand5.privacyscreen.PrivacyScreenApplication;
 import com.sand5.privacyscreen.R;
@@ -811,7 +812,7 @@ public class PrivacyShadeService extends Service {
                 mFirebaseAnalytics.logEvent("Menu_Events", bundle);
                 stopSelf();
                 Intent i = new Intent(PrivacyShadeService.this, SettingsActivity.class);
-                //i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(i);
                 //hideHamburgerMenu();
             }
@@ -1505,11 +1506,15 @@ public class PrivacyShadeService extends Service {
             windowManager.removeView(circleZoomView);
         }
 
-        endTime = getCurrentTime();
-        Bundle bundle = new Bundle();
-        bundle.putString("Stop_Time", endTime);
-        bundle.putString("Total_Usage_time", getTimeDifference(startTime, endTime));
-        mFirebaseAnalytics.logEvent("Lifecycle_Events", bundle);
+        try {
+            endTime = getCurrentTime();
+            Bundle bundle = new Bundle();
+            bundle.putString("Stop_Time", endTime);
+            bundle.putString("Total_Usage_time", getTimeDifference(startTime, endTime));
+            mFirebaseAnalytics.logEvent("Lifecycle_Events", bundle);
+        } catch (Exception exception) {
+            FirebaseCrash.report(exception);
+        }
 
         boolean shouldShowNotifications = preferences.getBoolean("should_show_notifications", true);
         if (shouldShowNotifications) {
