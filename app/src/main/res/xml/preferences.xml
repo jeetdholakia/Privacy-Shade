@@ -34,6 +34,14 @@
             android:summary="Display active notification to turn the shade on and off"
             android:title="Active Notification" />
 
+        <android.support.v7.preference.SwitchPreferenceCompat
+            android:id="@+id/notification_status_bar_icon"
+            android:defaultValue="true"
+            android:icon="@drawable/ic_security_black_24dp"
+            android:key="should_show_notification_icon"
+            android:summary="Display active notification icon on status bar"
+            android:title="Active Notification Icon" />
+
         <android.support.v7.preference.Preference
             android:icon="@drawable/ic_info_24dp"
             android:key="account_settings"

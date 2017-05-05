@@ -3,8 +3,17 @@ package com.sand5.privacyscreen.utils;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Canvas;
 import android.graphics.Matrix;
+import android.os.Environment;
+import android.support.annotation.NonNull;
+
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.orhanobut.logger.Logger;
+
+import java.io.File;
 
 /**
  * Created by jeetdholakia on 4/28/17.
@@ -12,24 +21,21 @@ import android.graphics.Matrix;
 
 public class BitmapUtils {
 
-    public static Bitmap getScaledBitmap(Bitmap originalImage, int width, int height) {
-        Bitmap background = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+    public static Bitmap getScaledBitmap(Bitmap bm, int newWidth, int newHeight) {
+        int width = bm.getWidth();
+        int height = bm.getHeight();
+        float scaleWidth = ((float) newWidth) / width;
+        float scaleHeight = ((float) newHeight) / height;
 
-        float originalWidth = originalImage.getWidth();
-        float originalHeight = originalImage.getHeight();
+        // Create a matrix for the manipulation
+        Matrix matrix = new Matrix();
 
-        Canvas canvas = new Canvas(background);
+        // Resize the bit map
+        matrix.postScale(scaleWidth, scaleHeight);
 
-        float scale = width / originalWidth;
+        // Recreate the new Bitmap
 
-        float xTranslation = 0.0f;
-        float yTranslation = (height - originalHeight * scale) / 2.0f;
-
-        Matrix transformation = new Matrix();
-        transformation.postTranslate(xTranslation, yTranslation);
-        transformation.preScale(scale, scale);
-        canvas.drawBitmap(originalImage, transformation, null);
-        return background;
+        return Bitmap.createBitmap(bm, 0, 0, width, height, matrix, false);
     }
 
     public static Bitmap decodeSampledBitmapFromResource(Resources res, int resId,
@@ -46,6 +52,22 @@ public class BitmapUtils {
         // Decode bitmap with inSampleSize set
         options.inJustDecodeBounds = false;
         return BitmapFactory.decodeResource(res, resId, options);
+    }
+
+    public static Bitmap decodeSampledBitmapFromResource(int reqWidth, int reqHeight) {
+        File rootPath = new File(Environment.getExternalStorageDirectory(), "Privacy Shade Wallpapers");
+        File localFile = new File(rootPath, "wallpaper.jpg");
+        // First decode with inJustDecodeBounds=true to check dimensions
+        final BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(localFile.getAbsolutePath(), options);
+
+        // Calculate inSampleSize
+        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
+
+        // Decode bitmap with inSampleSize set
+        options.inJustDecodeBounds = false;
+        return BitmapFactory.decodeFile(localFile.getAbsolutePath(), options);
     }
 
     public static int calculateInSampleSize(
@@ -69,6 +91,35 @@ public class BitmapUtils {
         }
 
         return inSampleSize;
+    }
+
+    public static Bitmap getBitmapFromUrl(String url, FirebaseStorage firebaseStorage) {
+        Logger.d("getBitmapFromURL called: " + url);
+        StorageReference storageReference = firebaseStorage.getReferenceFromUrl(url);
+        final Bitmap[] finalBitmap = new Bitmap[1];
+        final long ONE_MEGABYTE = 1024 * 1024;
+        storageReference.getBytes(ONE_MEGABYTE).addOnSuccessListener(new OnSuccessListener<byte[]>() {
+            @Override
+            public void onSuccess(byte[] bytes) {
+                Logger.d("Download successful");
+                Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                finalBitmap[0] = bmp.copy(Bitmap.Config.ARGB_8888, true);
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception exception) {
+                // Handle any errors
+                Logger.e("Download not successful");
+            }
+        });
+        return finalBitmap[0];
+    }
+
+    public static Bitmap getBitmapFromFile() {
+        File rootPath = new File(Environment.getExternalStorageDirectory(), "Privacy Shade Wallpapers");
+        File localFile = new File(rootPath, "wallpaper.jpg");
+        BitmapFactory.Options bmOptions = new BitmapFactory.Options();
+        return BitmapFactory.decodeFile(localFile.getAbsolutePath(), bmOptions);
     }
 
 }

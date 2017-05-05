@@ -102,4 +102,7 @@
     <string name="customize">Customize</string>
     <string name="facebook_app_id">1910085335935751</string>
     <string name="error_facebook_login">Error while logging into facebook</string>
+    <string name="walkthrough_drag_text">Touch to drag the window</string>
+    <string name="walkthrough_zoom_text">Touch to zoom in and out the window</string>
+    <string name="walkthrough_menu_text">Touch to open the menu</string>
 </resources>

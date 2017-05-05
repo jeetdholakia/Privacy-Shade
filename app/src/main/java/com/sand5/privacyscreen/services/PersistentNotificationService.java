@@ -6,12 +6,14 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.BitmapFactory;
 import android.os.IBinder;
 import android.support.v7.app.NotificationCompat;
 import android.util.Log;
 
 import com.google.firebase.crash.FirebaseCrash;
 import com.orhanobut.logger.Logger;
+import com.sand5.privacyscreen.PrivacyScreenApplication;
 import com.sand5.privacyscreen.R;
 import com.sand5.privacyscreen.activities.MainActivity;
 import com.sand5.privacyscreen.utils.Constants;
@@ -26,6 +28,7 @@ public class PersistentNotificationService extends Service {
 
     private final String TAG = "NotificationService";
     private boolean isRunning = false;
+    private SharedPreferences preferences;
 
 
     public PersistentNotificationService() {
@@ -39,6 +42,7 @@ public class PersistentNotificationService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        preferences = PrivacyScreenApplication.getInstance().getSharedPreferences();
         Logger.d("PrivacyShadeService.onStartCommand()");
         if (intent != null) {
             Logger.d("Intent is not null");
@@ -64,21 +68,42 @@ public class PersistentNotificationService extends Service {
     }
 
     private void startForegroundService() {
+        boolean shouldShowStatusBarIcon = preferences.getBoolean("should_show_notification_icon", false);
+
         Intent stopServiceIntent = new Intent(this, PersistentNotificationService.class);
         stopServiceIntent.setAction(Constants.STOPFOREGROUND_ACTION);
         PendingIntent stopServicePendingIntent = PendingIntent.getService(this, 0, stopServiceIntent, PendingIntent.FLAG_CANCEL_CURRENT);
 
-        Notification notification = new NotificationCompat.Builder(this)
-                .setContentTitle(getResources().getString(R.string.app_name) + " " + getResources().getString(R.string.notification_joiner_shade_is_off))
-                .setContentText(getResources().getString(R.string.notification_turn_on_shade))
-                .setSmallIcon(android.R.color.transparent)
-                .setVisibility(NotificationCompat.VISIBILITY_SECRET)
-                .setPriority(Notification.PRIORITY_MIN)
-                .setContentIntent(stopServicePendingIntent)
-                .setOngoing(true)
-                .setAutoCancel(false)
-                .build();
-        startForeground(9999, notification);
+
+        if (shouldShowStatusBarIcon) {
+            Notification notification = new NotificationCompat.Builder(this)
+                    .setContentTitle(getResources().getString(R.string.app_name) + " " + getResources().getString(R.string.notification_joiner_shade_is_off))
+                    .setContentText(getResources().getString(R.string.notification_turn_on_shade))
+                    .setLargeIcon(BitmapFactory.decodeResource(getApplicationContext().getResources(),
+                            R.drawable.ic_stat_security))
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+                    .setPriority(Notification.PRIORITY_MIN)
+                    .setContentIntent(stopServicePendingIntent)
+                    .setOngoing(true)
+                    .setAutoCancel(false)
+                    .build();
+            startForeground(9999, notification);
+        } else {
+            Notification notification = new NotificationCompat.Builder(this)
+                    .setContentTitle(getResources().getString(R.string.app_name) + " " + getResources().getString(R.string.notification_joiner_shade_is_off))
+                    .setContentText(getResources().getString(R.string.notification_turn_on_shade))
+                    .setSmallIcon(android.R.color.transparent)
+                    .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+                    .setPriority(Notification.PRIORITY_MIN)
+                    .setContentIntent(stopServicePendingIntent)
+                    .setOngoing(true)
+                    .setAutoCancel(false)
+                    .build();
+            startForeground(9999, notification);
+        }
+
+
     }
 
     @Override

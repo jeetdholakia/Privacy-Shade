@@ -72,4 +72,14 @@
         <item>@color/green_accent</item>
         <item>@color/blue_grey_accent</item>
     </array>
+
+    <!-- colors for vinyl activity theme -->
+    <color name="vinyl_primary">#607D8B</color>
+    <color name="vinyl_primary_dark">#455A64</color>
+    <color name="vinyl_primary_light">#CFD8DC</color>
+    <color name="vinyl_accent">#FF5252</color>
+    <color name="vinyl_primary_text">#212121</color>
+    <color name="vinyl_secondary_text">#757575</color>
+    <color name="vinyl_icons">#FFFFFF</color>
+    <color name="vinyl_divider">#BDBDBD</color>
 </resources>

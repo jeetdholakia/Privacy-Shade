@@ -19,6 +19,7 @@ public class OnBoardingActivity extends MaterialIntroActivity {
     SharedPreferences preferences;
     boolean isFirstTime;
     Bundle bundle = new Bundle();
+    int launchCount;
     private FirebaseAnalytics mFirebaseAnalytics;
 
     @Override
@@ -27,6 +28,8 @@ public class OnBoardingActivity extends MaterialIntroActivity {
         mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
         preferences = PrivacyScreenApplication.getInstance().getSharedPreferences();
         isFirstTime = preferences.getBoolean("isFirstTime", true);
+        launchCount = preferences.getInt("launchCount", 0);
+        preferences.edit().putInt("launchCount", launchCount++).commit();
 
         if (isFirstTime) {
             showOnBoardingPages();

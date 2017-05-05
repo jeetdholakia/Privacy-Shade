@@ -8,10 +8,19 @@
         <item name="colorAccent">@color/colorAccent</item>
     </style>
 
-    <style name="Theme.AppCompat.Translucent">
-        <item name="colorPrimary">@color/colorPrimary</item>
-        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
-        <item name="colorAccent">@color/colorAccent</item>
+    <style name="DarkAppTheme" parent="AppTheme">
+        <!-- Customize your theme here. -->
+        <item name="colorPrimary">@color/vinyl_primary</item>
+        <item name="colorPrimaryDark">@color/vinyl_primary_dark</item>
+        <item name="colorAccent">@color/vinyl_accent</item>
+        <item name="android:textColorPrimary">@color/vinyl_primary_text</item>
+        <item name="android:textColorSecondary">@color/vinyl_secondary_text</item>
+        <item name="android:dividerHorizontal">@color/vinyl_divider</item>
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <style name="Theme.AppCompat.Translucent" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:colorBackgroundCacheHint">@null</item>

@@ -13,10 +13,9 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.ColorFilter;
-import android.graphics.LightingColorFilter;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
@@ -25,7 +24,6 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.CountDownTimer;
@@ -51,8 +49,10 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.SeekBar;
+import android.widget.TextView;
 
-import com.google.android.gms.appinvite.AppInviteInvitation;
+import com.andexert.library.RippleView;
+import com.google.firebase.FirebaseApp;
 import com.google.firebase.analytics.FirebaseAnalytics;
 import com.google.firebase.crash.FirebaseCrash;
 import com.orhanobut.logger.Logger;
@@ -63,13 +63,13 @@ import com.sand5.privacyscreen.activities.VinylActivity;
 import com.sand5.privacyscreen.events.OnScreenLockEvent;
 import com.sand5.privacyscreen.events.OnScreenUnLockEvent;
 import com.sand5.privacyscreen.receivers.ScreenLockReceiver;
+import com.sand5.privacyscreen.utils.ArrayUtils;
+import com.sand5.privacyscreen.utils.BitmapUtils;
 import com.sand5.privacyscreen.utils.Constants;
 import com.sand5.privacyscreen.utils.ServiceBootstrap;
 import com.sand5.privacyscreen.utils.VisibleToggleClickListener;
 import com.squareup.otto.Bus;
 import com.squareup.otto.Subscribe;
-import com.tomergoldst.tooltips.ToolTip;
-import com.tomergoldst.tooltips.ToolTipsManager;
 import com.transitionseverywhere.Fade;
 import com.transitionseverywhere.Transition;
 import com.transitionseverywhere.TransitionManager;
@@ -91,15 +91,18 @@ import static com.sand5.privacyscreen.utils.DisplayUtils.pxToDp;
 public class PrivacyShadeService extends Service {
 
     // TODO: 4/17/17 Walk-through
-    // TODO: 4/22/17 Gradient on circle and line
+    // TODO: 5/3/17 Custom imageView with canvas
+    // TODO: 4/28/17 Decode bitmaps as per aspect ratio
     // TODO: 4/22/17 Vinyl Store IAP
-    // TODO: 4/24/17 Divide menus into primary and secondary items and put them in settings activity
     // TODO: 4/24/17 Make menu movable
-    // TODO: 4/25/17 Add help button and show assistance
-    // TODO: 4/25/17 Fix multiple touching on various elements
     // TODO: 4/26/17 Add fire base invites
-    // TODO: 4/28/17 Decode bitmaps perfectly
-
+    // TODO: 5/2/17 Add color/vinyl/wallpaper selector
+    // TODO: 5/3/17 Auto night-mode/auto dim after touch
+    // TODO: 5/3/17 Permission for read/write storage
+    // TODO: 5/3/17 Check network settings in vinyl activity
+    // TODO: 5/3/17 Load bitmap asynchronously
+    // TODO: 5/3/17 Ratings Activity
+    // TODO: 5/3/17 Find new Vinyls
 
     public static boolean isRunning = false;
     static String endTime;
@@ -113,9 +116,6 @@ public class PrivacyShadeService extends Service {
     int circleViewDestinationX;
     int circleViewDestinationY;
     int counter = 0;
-    int numberOfFingers;
-    int x_cord_Destination;
-    int y_cord_Destination;
     ImageView topLineDragView;
     ImageView topLineZoomView;
     ImageView bottomLineDragView;
@@ -123,7 +123,6 @@ public class PrivacyShadeService extends Service {
     LinearLayout toggleShapeLinearLayout;
     boolean isFirstTimeOpen;
     boolean shouldShowNotification;
-    ToolTipsManager mToolTipsManager;
     RelativeLayout dragTooltipHolder;
     RelativeLayout menuParent;
     CustomTabsClient mCustomTabsClient;
@@ -131,6 +130,10 @@ public class PrivacyShadeService extends Service {
     CustomTabsServiceConnection mCustomTabsServiceConnection;
     CustomTabsIntent mCustomTabsIntent;
     int cx, cy, x, y;
+    Runnable bottomLineRunnable;
+    Runnable topLineRunnable;
+    Thread topLineThread;
+    Thread bottomLineThread;
     private int screenHeight;
     private int screenWidth;
     private WindowManager windowManager;
@@ -148,8 +151,7 @@ public class PrivacyShadeService extends Service {
     private SharedPreferences preferences;
     private Rect transparentRect;
     private RelativeLayout bottomLineView;
-    //Bitmap sourceBitmap;
-    //Bitmap scaledBitmap;
+    private Bitmap scaledBitmap;
     private RelativeLayout topLineView;
     private int defaultRectangleHeight = dpToPx(100);
     private float defaultOpacity;
@@ -158,14 +160,25 @@ public class PrivacyShadeService extends Service {
     private Matrix matrix = new Matrix();
     private BitmapDrawable bitmapDrawable;
     private FirebaseAnalytics mFirebaseAnalytics;
+    private Handler handler;
+    private int touchedViewId;
+    private ImageView privacyShadeImageView;
+    private RelativeLayout zoomHelpRelativeLayout;
+    private RelativeLayout dragHelpRelativeLayout;
+    private RelativeLayout menuHelpRelativeLayout;
+
     View.OnTouchListener bottomLineTouchListener = new View.OnTouchListener() {
 
         int numberOfFingers;
         int x_cord_Destination, y_cord_Destination;
 
-
         @Override
         public boolean onTouch(final View v, MotionEvent event) {
+            if (isFirstTimeOpen) {
+                removeWalkThroughLayouts();
+            }
+            setTouchedViewId(v.getId());
+
             hideHamburgerMenu();
             numberOfFingers = event.getPointerCount();
             WindowManager.LayoutParams bottomLineLayoutParams = (WindowManager.LayoutParams) bottomLineView.getLayoutParams();
@@ -186,6 +199,7 @@ public class PrivacyShadeService extends Service {
                     break;
 
                 case MotionEvent.ACTION_MOVE:
+                    // fadeInRectangleWindow();
                     counter += 1;
                     if ((REFRESH_RATE % counter) == 0) {
                         if (y_cord > y_init_cord) {
@@ -218,36 +232,8 @@ public class PrivacyShadeService extends Service {
                             windowManager.updateViewLayout(topLineView, topLineLayoutParams);
                         }
 
-                        bottomLineView.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                int[] bottomLineLocation = new int[2];
-                                int[] topLineLocation = new int[2];
-                                bottomLineView.getLocationOnScreen(bottomLineLocation);
-                                //int x = bottomLineLocation[0];
-                                int bottomLineY = bottomLineLocation[1];
-                                Logger.d("Bottom Line Y: " + bottomLineY);
-                                topLineView.getLocationOnScreen(topLineLocation);
-                                int topLineY = topLineLocation[1];
-                                Logger.d("Top Line Y: " + topLineY);
-                                resetBitmapColor();
-                                transparentRect = new Rect(0, topLineY + 90, screenWidth, bottomLineY + 15);
-                                if (v.getId() == R.id.bottomLine_zoomLineView) {
-                                    defaultRectangleHeight = transparentRect.height();
-                                    Bundle bundle = new Bundle();
-                                    bundle.putString("Bottom_Line_Dragged_to", "Bottom Line Zoomed to:" + bottomLineY);
-                                    bundle.putString("New_Rectangle_height", "" + defaultRectangleHeight);
-                                    mFirebaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
-                                }
-                                privacyShadeCanvas.drawRect(transparentRect, transparentPaint);
-                                bitmapDrawable = new BitmapDrawable(getResources(), privacyShadeBitmap);
-
-                                //Uncomment these lines when vinyl is added
-                                //privacyShadeCanvas = new Canvas(privacyShadeBitmap);
-                                // privacyShadeCanvas.drawBitmap(privacyShadeBitmap, matrix, null);
-                                privacyShadeView.setBackground(bitmapDrawable);
-                            }
-                        });
+                        handler.post(bottomLineRunnable);
+                        //bottomLineThread.start();
                     }
                     counter = 0;
                     break;
@@ -255,6 +241,8 @@ public class PrivacyShadeService extends Service {
                     Bundle bundle = new Bundle();
                     bundle.putString("Rectangle_Position", "Rectangle Position at time: " + getCurrentTime() + "\t" + getCurrentDate() + "\n Top: " + transparentRect.top + "\n Left: " + transparentRect.left + "\n Bottom: " + transparentRect.bottom + "\n Right: " + transparentRect.right);
                     mFirebaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
+                    // handler.removeCallbacks(bottomLineRunnable);
+                    // fadeOutRectangleWindow();
                     break;
                 default:
                     break;
@@ -264,11 +252,16 @@ public class PrivacyShadeService extends Service {
     };
     View.OnTouchListener topLineTouchListener = new View.OnTouchListener() {
 
+
         int numberOfFingers;
         int x_cord_Destination, y_cord_Destination;
 
         @Override
         public boolean onTouch(final View v, MotionEvent event) {
+            if (isFirstTimeOpen) {
+                removeWalkThroughLayouts();
+            }
+            setTouchedViewId(v.getId());
             hideHamburgerMenu();
             numberOfFingers = event.getPointerCount();
             WindowManager.LayoutParams bottomLineLayoutParams = (WindowManager.LayoutParams) bottomLineView.getLayoutParams();
@@ -307,9 +300,7 @@ public class PrivacyShadeService extends Service {
                     topLineLayoutParams.x = x_cord_Destination;
                     topLineLayoutParams.y = y_cord_Destination;
 
-
                     windowManager.updateViewLayout(topLineView, topLineLayoutParams);
-
 
                     if (v.getId() == R.id.topLine_dragLineView) {
 
@@ -321,40 +312,17 @@ public class PrivacyShadeService extends Service {
                         bottomLineLayoutParams.y = y_cord_Destination + defaultRectangleHeight + 90;
                         windowManager.updateViewLayout(bottomLineView, bottomLineLayoutParams);
                     }
-
-                    topLineView.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            int[] bottomLineLocation = new int[2];
-                            int[] topLineLocation = new int[2];
-                            topLineView.getLocationOnScreen(topLineLocation);
-                            //int x = topLineLocation[0];
-                            int topLineY = topLineLocation[1];
-                            Logger.d("Bottom Line Y: " + topLineY);
-                            bottomLineView.getLocationOnScreen(bottomLineLocation);
-                            int bottomLineY = bottomLineLocation[1];
-                            Logger.d("Top Line Y: " + topLineY);
-
-                            resetBitmapColor();
-                            transparentRect = new Rect(0, topLineY + 90, screenWidth, bottomLineY + 15);
-                            privacyShadeCanvas.drawRect(transparentRect, transparentPaint);
-                            if (v.getId() == R.id.topLine_zoomLineView) {
-                                defaultRectangleHeight = transparentRect.height();
-
-                                Bundle bundle = new Bundle();
-                                bundle.putString("Bottom_Line_Zoom", "Bottom Line Zoomed to:" + bottomLineY);
-                                bundle.putString("New_Rectangle_Height", "New rectangle height: " + defaultRectangleHeight);
-                                mFirebaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
-                            }
-                            bitmapDrawable = new BitmapDrawable(getResources(), privacyShadeBitmap);
-                            privacyShadeView.setBackground(bitmapDrawable);
-                        }
-                    });
+                    handler.post(topLineRunnable);
+                    //topLineThread.start();
                     break;
                 case MotionEvent.ACTION_UP:
+                    // handler.removeCallbacks(topLineRunnable);
                     Bundle bundle = new Bundle();
                     bundle.putString("Rectangle_Position", "Rectangle Position at time: " + getCurrentTime() + "\t" + getCurrentDate() + "\n Top: " + transparentRect.top + "\n Left: " + transparentRect.left + "\n Bottom: " + transparentRect.bottom + "\n Right: " + transparentRect.right);
                     mFirebaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
+
+                    //fadeOutRectangleWindow();
+
                     break;
                 default:
                     break;
@@ -362,22 +330,28 @@ public class PrivacyShadeService extends Service {
             return true;
         }
     };
+
     private int defaultCircleDiameter = dpToPx(150);
     private RelativeLayout circlePullView;
     private RelativeLayout circleZoomView;
+    private String backgroundType;
+
     View.OnTouchListener circleEyeTouchListener = new View.OnTouchListener() {
+
+        int x_cord_Destination, y_cord_Destination;
+
         @Override
         public boolean onTouch(View v, MotionEvent event) {
+
             hideHamburgerMenu();
-            numberOfFingers = event.getPointerCount();
             WindowManager.LayoutParams circleViewParams = (WindowManager.LayoutParams) circleView.getLayoutParams();
             WindowManager.LayoutParams circlePullViewParams = (WindowManager.LayoutParams) circlePullView.getLayoutParams();
             WindowManager.LayoutParams circleZoomViewParams = (WindowManager.LayoutParams) circleZoomView.getLayoutParams();
-
             int x_cord = (int) event.getRawX();
             int y_cord = (int) event.getRawY();
 
             switch (event.getAction() & MotionEvent.ACTION_MASK) {
+
                 case MotionEvent.ACTION_DOWN:
                     if (brightnessSeekBarHolderLayout.getVisibility() == View.VISIBLE) {
                         brightnessSeekBarHolderLayout.setVisibility(View.GONE);
@@ -442,12 +416,14 @@ public class PrivacyShadeService extends Service {
         }
     };
     View.OnTouchListener circleZoomTouchListener = new View.OnTouchListener() {
+
+        int x_cord_Destination, y_cord_Destination;
+
         @Override
         public boolean onTouch(View v, MotionEvent event) {
             hideHamburgerMenu();
-            numberOfFingers = event.getPointerCount();
-            final WindowManager.LayoutParams circleViewParams = (WindowManager.LayoutParams) circleView.getLayoutParams();
-            final WindowManager.LayoutParams circlePullViewParams = (WindowManager.LayoutParams) circlePullView.getLayoutParams();
+            WindowManager.LayoutParams circleViewParams = (WindowManager.LayoutParams) circleView.getLayoutParams();
+            WindowManager.LayoutParams circlePullViewParams = (WindowManager.LayoutParams) circlePullView.getLayoutParams();
             WindowManager.LayoutParams circleZoomViewParams = (WindowManager.LayoutParams) circleZoomView.getLayoutParams();
 
             int x_cord = (int) event.getRawX();
@@ -455,6 +431,7 @@ public class PrivacyShadeService extends Service {
 
 
             switch (event.getAction() & MotionEvent.ACTION_MASK) {
+
                 case MotionEvent.ACTION_DOWN:
 
                     //get initial circle coordinates
@@ -542,15 +519,26 @@ public class PrivacyShadeService extends Service {
     private BroadcastReceiver screenLockReceiver;
     private boolean isClosedBeforeLock = false;
 
+    public int getTouchedViewId() {
+        return touchedViewId;
+    }
+
+    public void setTouchedViewId(int touchedViewId) {
+        this.touchedViewId = touchedViewId;
+    }
+
     @SuppressWarnings("deprecation")
     @Override
     public void onCreate() {
         super.onCreate();
         Bus bus = PrivacyScreenApplication.bus;
         bus.register(this);
+        FirebaseApp.initializeApp(this);
+
         Logger.d("PrivacyShadeService.onCreate()");
         mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
         preferences = PrivacyScreenApplication.getInstance().getSharedPreferences();
+        initializeThreads();
     }
 
     private void handleStart() {
@@ -558,6 +546,7 @@ public class PrivacyShadeService extends Service {
         Initial configuration of everything
          */
         isFirstTimeOpen = preferences.getBoolean("isFirstTime", true);
+        Logger.d("Is first time open? " + isFirstTimeOpen);
         shouldShowNotification = preferences.getBoolean("should_show_notifications", true);
         Logger.d("Should show notification first: " + shouldShowNotification);
         startTime = getCurrentTime();
@@ -565,6 +554,7 @@ public class PrivacyShadeService extends Service {
         Bundle bundle = new Bundle();
         bundle.putString("Start_time", "Overlay started at time: " + startTime + "on " + currentDate);
         mFirebaseAnalytics.logEvent("Lifecycle_Events", bundle);
+
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         inflater = (LayoutInflater) getSystemService(LAYOUT_INFLATER_SERVICE);
 
@@ -590,13 +580,14 @@ public class PrivacyShadeService extends Service {
             }
         }
         addPrivacyShadeMenu();
+        setUpScreenLockReceiver();
+        /*if (isFirstTimeOpen) {
+            //showFirstTimeWalkThrough();
+        }*/
+
         /*if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP_MR1) {
             collectAppUsageData();
         }*/
-        setUpScreenLockReceiver();
-        if (isFirstTimeOpen) {
-            showFirstTimeWalkThrough();
-        }
     }
 
     private void createDefaultPrivacyShade() {
@@ -620,14 +611,20 @@ public class PrivacyShadeService extends Service {
         transparentPaint.setColor(Color.TRANSPARENT);
         transparentPaint.setAntiAlias(true);
 
-        // TODO: 4/30/17 Uncomment this in 1.9.0
-        //sourceBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.testbg2);
-        //scaledBitmap = BitmapUtils.getScaledBitmap(sourceBitmap,screenWidth,screenHeight);
-        //privacyShadeBitmap = Bitmap.createBitmap(scaledBitmap, 0, 0, screenWidth, screenHeight);
+        backgroundType = "color";//preferences.getString("background_type","color");
 
-        privacyShadeBitmap = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.ARGB_8888);
-        privacyShadeBitmap.eraseColor((ContextCompat.getColor(getApplicationContext(), R.color.black)));
-        bitmapDrawable = new BitmapDrawable(getResources(), privacyShadeBitmap);
+        if (backgroundType.equals("color")) {
+            Logger.d("Background type is color");
+            privacyShadeBitmap = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.ARGB_8888);
+            privacyShadeBitmap.eraseColor((ContextCompat.getColor(getApplicationContext(), R.color.black)));
+        } else {
+            Logger.d("Background type is wallpaper/vinyl");
+            Bitmap sourceBitmap = BitmapUtils.getBitmapFromFile();
+            scaledBitmap = BitmapUtils.getScaledBitmap(sourceBitmap, screenWidth, screenHeight);
+            privacyShadeBitmap = Bitmap.createBitmap(scaledBitmap, 0, 0, screenWidth, screenHeight);
+        }
+
+        //bitmapDrawable = new BitmapDrawable(getResources(), privacyShadeBitmap);
         privacyShadeCanvas = new Canvas(privacyShadeBitmap);
         privacyShadeCanvas.drawBitmap(privacyShadeBitmap, matrix, null);
     }
@@ -635,6 +632,7 @@ public class PrivacyShadeService extends Service {
     @SuppressLint("InflateParams")
     private void addPrivacyShade() {
         privacyShadeView = (RelativeLayout) inflater.inflate(R.layout.layout_privacy_screen, null);
+        privacyShadeImageView = (ImageView) privacyShadeView.findViewById(R.id.privacyShade_imageView);
         szWindow.set(screenWidth, screenHeight);
 
         /*
@@ -659,7 +657,7 @@ public class PrivacyShadeService extends Service {
         Punch a transparent rectangle into the privacy shade
          */
         privacyShadeCanvas.drawRect(transparentRect, transparentPaint);
-        privacyShadeView.setBackground(bitmapDrawable);
+        privacyShadeImageView.setImageBitmap(privacyShadeBitmap);
         if (toggleCircleButton != null) {
             toggleCircleButton.setImageResource(R.drawable.ic_panorama_fish_eye_white_24dp);
         }
@@ -671,10 +669,6 @@ public class PrivacyShadeService extends Service {
         bottom = transparentRect.bottom;
         //right = transparentRect.right;
 
-        /*Logger.d("Transparent Rectangle Top: " + top);
-        Logger.d("Transparent Rectangle Left: " + left);
-        Logger.d("Transparent Rectangle Bottom: " + bottom);
-        Logger.d("Transparent Rectangle Right: " + right);*/
 
         /*
         Add bottom line to the transparent rectangle
@@ -698,26 +692,6 @@ public class PrivacyShadeService extends Service {
         bottomLineDragView.setOnTouchListener(bottomLineTouchListener);
         bottomLineZoomView.setOnTouchListener(bottomLineTouchListener);
 
-        /*bottomLineView.post(new Runnable() {
-            @Override
-            public void run() {
-                int[] bottomLineCoordinates = new int[2];
-                int bottomLineCoordinateX;
-                int bottomLineCoordinateY;
-
-                bottomLineView.getLocationOnScreen(bottomLineCoordinates);
-                bottomLineCoordinateX = bottomLineCoordinates[0];
-                bottomLineCoordinateY = bottomLineCoordinates[1];
-                Logger.d("Line View Height: " + bottomLineView.getHeight());
-                Logger.d("Line View Width: " + bottomLineView.getWidth());
-                Logger.d("Line View X: " + bottomLineView.getX());
-                Logger.d("Line View Y: " + bottomLineView.getY());
-                Logger.d("Line View Screen X: " + bottomLineCoordinateX);
-                Logger.d("Line View Screen Y: " + bottomLineCoordinateY);
-
-            }
-        });*/
-
         /*
         Add topline view over transparent rectangle
          */
@@ -736,19 +710,62 @@ public class PrivacyShadeService extends Service {
         windowManager.addView(topLineView, topLineParams);
         topLineDragView.setOnTouchListener(topLineTouchListener);
         topLineZoomView.setOnTouchListener(topLineTouchListener);
+    }
 
-        /*topLineView.post(new Runnable() {
-            @Override
-            public void run() {
-                //Logger.d("Line Padding top: " + topLineView.getY());
-            }
-        });*/
+    @SuppressLint("InflateParams")
+    @SuppressWarnings("deprecation")
+    private void showFirstTimeWalkThrough() {
+
+        Logger.d("Showing first time walkthrough");
+
+        dragHelpRelativeLayout = (RelativeLayout) inflater.inflate(R.layout.layout_walkthrough, null);
+        TextView dragHelpTextView = (TextView) dragHelpRelativeLayout.findViewById(R.id.textView_walkThrough);
+        dragHelpTextView.setText(getResources().getString(R.string.walkthrough_drag_text));
+        zoomHelpRelativeLayout = (RelativeLayout) inflater.inflate(R.layout.layout_walkthrough, null);
+        TextView zoomHelpTextView = (TextView) zoomHelpRelativeLayout.findViewById(R.id.textView_walkThrough);
+        zoomHelpTextView.setText(getResources().getString(R.string.walkthrough_zoom_text));
+        menuHelpRelativeLayout = (RelativeLayout) inflater.inflate(R.layout.layout_walkthrough, null);
+        TextView menuHelpTextView = (TextView) menuHelpRelativeLayout.findViewById(R.id.textView_walkThrough);
+        menuHelpTextView.setText(getResources().getString(R.string.walkthrough_menu_text));
+
+        WindowManager.LayoutParams dragHelperParams = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                PixelFormat.TRANSLUCENT);
+        dragHelperParams.gravity = Gravity.TOP | Gravity.END;
+        dragHelperParams.y = (int) bottomLineView.getY() + dpToPx(15);
+
+        WindowManager.LayoutParams zoomHelperParams = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                PixelFormat.TRANSLUCENT);
+        zoomHelperParams.gravity = Gravity.TOP | Gravity.START;
+        zoomHelperParams.y = (int) topLineView.getY() - topLineView.getWidth() - dpToPx(15);
+
+        WindowManager.LayoutParams menuHelperParams = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                PixelFormat.TRANSLUCENT);
+        menuHelperParams.gravity = Gravity.TOP | Gravity.END;
+        menuHelperParams.y = (int) menuParent.getY();
+
+        windowManager.addView(dragHelpRelativeLayout, dragHelperParams);
+        windowManager.addView(menuHelpRelativeLayout, menuHelperParams);
+        windowManager.addView(zoomHelpRelativeLayout, zoomHelperParams);
     }
 
     @SuppressLint("InflateParams")
     private void addPrivacyShadeMenu() {
+
         menuParent = (RelativeLayout) inflater.inflate(R.layout.layout_menu_privacy_shade, null);
         menuView = (RelativeLayout) menuParent.findViewById(R.id.privacyShade_menu_holder);
+
         WindowManager.LayoutParams menuParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
@@ -758,22 +775,25 @@ public class PrivacyShadeService extends Service {
         menuParams.gravity = Gravity.TOP | Gravity.END;
         menuParams.y = getStatusBarHeight(getApplicationContext()) * 2;
 
-        LinearLayout removeShadeButton = (LinearLayout) menuView.findViewById(R.id.button_close_privacy_screen);
+        RippleView removeShadeButton = (RippleView) menuView.findViewById(R.id.hamburger_close_shade_rippleView);
         toggleShapeLinearLayout = (LinearLayout) menuView.findViewById(R.id.toggle_circle_parent);
         toggleCircleButton = (ImageButton) menuView.findViewById(R.id.toggle_circle_imageButton);
-        LinearLayout toggleBrightnessSeekBarButton = (LinearLayout) menuView.findViewById(R.id.toggle_brightness_imageButton);
+        RippleView toggleBrightnessSeekBarButton = (RippleView) menuView.findViewById(R.id.brightness_menu_rippleView);
 
-        LinearLayout submitFeedbackButton = (LinearLayout) menuView.findViewById(R.id.submit_feedback_imageButton);
-        LinearLayout settingsButton = (LinearLayout) menuView.findViewById(R.id.button_privacy_screen_settings);
-        LinearLayout customizeShadeButton = (LinearLayout) menuView.findViewById(R.id.customize_imageButton);
-        final ImageButton toggleMenuButton = (ImageButton) menuParent.findViewById(R.id.button_toggle_menu);
-        LinearLayout shareButton = (LinearLayout) menuView.findViewById(R.id.button_share_screen);
+        RippleView submitFeedbackButton = (RippleView) menuView.findViewById(R.id.rippleView_menu_feedback);
+        RippleView settingsButton = (RippleView) menuView.findViewById(R.id.rippleView_menu_settings);
+        RippleView customizeShadeButton = (RippleView) menuView.findViewById(R.id.customize_menu_rippleView);
+        RippleView toggleShapeRippleView = (RippleView) menuView.findViewById(R.id.rippleView_menu_change_shape);
+        final RippleView toggleMenuButton = (RippleView) menuParent.findViewById(R.id.rippleView_menu_hamburger);
+
+        RippleView shareButton = (RippleView) menuView.findViewById(R.id.hamburger_share_rippleView);
 
 
         customizeShadeButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Intent customize = new Intent(PrivacyShadeService.this, VinylActivity.class);
+                customize.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(customize);
                 stopSelf();
             }
@@ -836,16 +856,20 @@ public class PrivacyShadeService extends Service {
                 Bundle bundle = new Bundle();
                 bundle.putString("Menu_Events", "Submit Feedback button clicked");
                 mFirebaseAnalytics.logEvent("Menu_Events", bundle);
-                openFeedbackTab();
                 hideHamburgerMenu();
                 stopSelf();
-
+                openFeedbackTab();
             }
         });
 
         toggleMenuButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+
+                if (isFirstTimeOpen) {
+                    removeWalkThroughLayouts();
+                }
+
                 if (menuView.getVisibility() == View.VISIBLE) {
                     menuView.setVisibility(View.GONE);
                 } else {
@@ -871,14 +895,13 @@ public class PrivacyShadeService extends Service {
                 Transition fadeTransition = new Fade();
                 fadeTransition.setDuration(400);
                 fadeTransition.setInterpolator(new FastOutSlowInInterpolator());
-                //fadeTransition.setStartDelay(200);
                 TransitionManager.beginDelayedTransition(brightnessSeekBarView, fadeTransition);
                 brightnessSeekBarHolderLayout.setVisibility(visible ? View.VISIBLE : View.GONE);
                 hideHamburgerMenu();
             }
         });
 
-        toggleCircleButton.setOnClickListener(new View.OnClickListener() {
+        toggleShapeRippleView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Bundle bundle = new Bundle();
@@ -915,7 +938,7 @@ public class PrivacyShadeService extends Service {
         });
     }
 
-    private void setPrivacyShadeMenuColors(ImageButton imageButton) {
+    /*private void setPrivacyShadeMenuColors(ImageButton imageButton) {
         int colorString = preferences.getInt("menu_color", Color.WHITE);
         Logger.d("Color from preferences:" + colorString);
 
@@ -923,6 +946,22 @@ public class PrivacyShadeService extends Service {
         ColorFilter filter = new LightingColorFilter(colorString, colorString);
         exitDrawable.setColorFilter(filter);
         imageButton.setImageDrawable(exitDrawable);
+    }*/
+
+    private void removeWalkThroughLayouts() {
+        preferences.edit().putBoolean("isFirstTime", false).apply();
+
+        if (menuHelpRelativeLayout != null) {
+            windowManager.removeView(menuHelpRelativeLayout);
+        }
+
+        if (dragHelpRelativeLayout != null) {
+            windowManager.removeView(dragHelpRelativeLayout);
+        }
+
+        if (zoomHelpRelativeLayout != null) {
+            windowManager.removeView(zoomHelpRelativeLayout);
+        }
     }
 
     @SuppressLint("InflateParams")
@@ -961,17 +1000,11 @@ public class PrivacyShadeService extends Service {
         circleImageView.post(new Runnable() {
             @Override
             public void run() {
-
-                /*Log.d(TAG, "Circle Height:" + circleImageView.getHeight());
-                Log.d(TAG, "Circle Width:" + circleImageView.getWidth());
-                Log.d(TAG, "Circle Height DP:" + pxToDp(circleImageView.getHeight()));
-                Log.d(TAG, "Circle Width DP:" + pxToDp(circleImageView.getWidth()));*/
-
                 /*
                 Punch a transparent circle into the privacy shade
                 */
                 privacyShadeCanvas.drawCircle(screenWidth / 2, screenHeight / 2, circleImageView.getWidth() / 2 - dpToPx(5), transparentPaint);
-                privacyShadeView.setBackground(bitmapDrawable);
+                privacyShadeImageView.setImageBitmap(privacyShadeBitmap);
                 addCirclePullBar();
                 addCircleZoomBar();
             }
@@ -997,17 +1030,6 @@ public class PrivacyShadeService extends Service {
         circlePullViewParams.x = x + (defaultCircleDiameter / 2) - (dpToPx(40) / 2); //- (circlePullView.getWidth()*2));
         circlePullViewParams.y = y - dpToPx(20) + dpToPx(3);
 
-        /*circlePullView.post(new Runnable() {
-            @Override
-            public void run() {
-                Log.d(TAG, "Circle Parent Height:" + circlePullView.getHeight());
-                Log.d(TAG, "Circle Parent Width:" + circlePullView.getWidth());
-                Log.d(TAG, "Circle Parent Height DP:" + pxToDp(circlePullView.getHeight()));
-                Log.d(TAG, "Circle Parent Width DP:" + pxToDp(circlePullView.getWidth()));
-            }
-        });*/
-
-
         ImageView circlePullImageView = (ImageView) circlePullView.findViewById(R.id.circle_pull_imageView);
         circlePullImageView.setOnTouchListener(circleEyeTouchListener);
         windowManager.addView(circlePullView, circlePullViewParams);
@@ -1031,17 +1053,6 @@ public class PrivacyShadeService extends Service {
         circleZoomViewParams.x = x + (defaultCircleDiameter / 2) - (dpToPx(40) / 2);
         circleZoomViewParams.y = y + defaultCircleDiameter - dpToPx(3);
 
-        /*circlePullView.post(new Runnable() {
-            @Override
-            public void run() {
-                Log.d(TAG, "Circle Parent Height:" + circlePullView.getHeight());
-                Log.d(TAG, "Circle Parent Width:" + circlePullView.getWidth());
-                Log.d(TAG, "Circle Parent Height DP:" + pxToDp(circlePullView.getHeight()));
-                Log.d(TAG, "Circle Parent Width DP:" + pxToDp(circlePullView.getWidth()));
-            }
-        });*/
-
-
         ImageView circleZoomImageView = (ImageView) circleZoomView.findViewById(R.id.circle_zoom_imageView);
         circleZoomImageView.setOnTouchListener(circleZoomTouchListener);
         windowManager.addView(circleZoomView, circleZoomViewParams);
@@ -1061,15 +1072,17 @@ public class PrivacyShadeService extends Service {
         seekBarParams.y = (int) menuParent.getY();
 
         final SeekBar brightnessSeekBar = (SeekBar) brightnessSeekBarView.findViewById(R.id.brightness_seekbar);
+
         brightnessSeekBar.setMax(maximumDefaultBrightness);
 
-        Logger.d("Default opacity: " + getDefaultOpacity());
         int progressBar = 100 - Math.round(getDefaultOpacity() * 100);
-        Logger.d("seekBar opacity: " + progressBar);
+
         Bundle bundle = new Bundle();
-        bundle.putString("Customization_Events", "Opacity at " + getCurrentTime() + "\t" + getCurrentDate() + "is: " + progressBar);
+        bundle.putString("Opacity", "Opacity at " + getCurrentTime() + "\t" + getCurrentDate() + "is: " + progressBar);
         mFirebaseAnalytics.logEvent("Customization_Events", bundle);
+
         brightnessSeekBar.setProgress(progressBar);
+
         brightnessSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -1077,7 +1090,6 @@ public class PrivacyShadeService extends Service {
                 float opacity = (float) (100 - progress) / 100;
                 Logger.d("Opacity that is put in preferences: " + opacity);
                 preferences.edit().putFloat("opacity", opacity).apply();
-                //Logger.d("On Progress Changed: " + opacity);
                 privacyShadeParams.alpha = opacity;
                 windowManager.updateViewLayout(privacyShadeView, privacyShadeParams);
             }
@@ -1090,7 +1102,7 @@ public class PrivacyShadeService extends Service {
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
                 Bundle bundle = new Bundle();
-                bundle.putString("Customization_Events", "Opacity changed at " + getCurrentTime() + "\t" + getCurrentDate() + "to: " + (100 - Math.round(getDefaultOpacity() * 100)));
+                bundle.putString("Opacity", "Opacity changed at " + getCurrentTime() + "\t" + getCurrentDate() + "to: " + (100 - Math.round(getDefaultOpacity() * 100)));
                 mFirebaseAnalytics.logEvent("Customization_Events", bundle);
 
                 final Handler h = new Handler();
@@ -1106,7 +1118,118 @@ public class PrivacyShadeService extends Service {
         windowManager.addView(brightnessSeekBarView, seekBarParams);
     }
 
-    private void onInviteClicked() {
+    private void initializeThreads() {
+
+        handler = new Handler();
+        bottomLineRunnable = new Runnable() {
+            @Override
+            public void run() {
+
+                int[] windowLineLocations = getWindowLineLocations();
+                /*int[] bottomLineLocation = new int[2];
+                int[] topLineLocation = new int[2];
+                bottomLineView.getLocationOnScreen(bottomLineLocation);
+                int x = bottomLineLocation[0];
+                Logger.d("Bottom Line Y: " + bottomLineY);
+                topLineView.getLocationOnScreen(topLineLocation);*/
+                int bottomLineY = windowLineLocations[3];
+                int topLineY = windowLineLocations[1];
+
+                resetBitmapColor();
+
+                transparentRect.top = topLineY + 90;
+                transparentRect.bottom = bottomLineY + 15;
+
+                if (getTouchedViewId() == R.id.bottomLine_zoomLineView) {
+                    defaultRectangleHeight = transparentRect.height();
+                    Bundle bundle = new Bundle();
+                    bundle.putString("Bottom_Line_Dragged_to", "Bottom Line Zoomed to:" + bottomLineY);
+                    bundle.putString("New_Rectangle_height", "" + defaultRectangleHeight);
+                    mFirebaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
+                }
+
+                if (backgroundType != null) {
+                    if (!backgroundType.equals("color")) {
+                        privacyShadeCanvas = new Canvas(privacyShadeBitmap);
+                        privacyShadeCanvas.drawBitmap(privacyShadeBitmap, matrix, null);
+                        privacyShadeCanvas.drawRect(transparentRect, transparentPaint);
+                        //bitmapDrawable = new BitmapDrawable(getResources(), privacyShadeBitmap);
+                    } else {
+                        privacyShadeCanvas.drawRect(transparentRect, transparentPaint);
+                        //bitmapDrawable = new BitmapDrawable(getResources(), privacyShadeBitmap);
+                    }
+                }
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        privacyShadeImageView.setImageBitmap(privacyShadeBitmap);
+                    }
+                });
+            }
+        };
+
+        topLineRunnable = new Runnable() {
+            @Override
+            public void run() {
+
+                int[] windowLineLocations = getWindowLineLocations();
+                /*int[] bottomLineLocation = new int[2];
+                int[] topLineLocation = new int[2];
+                bottomLineView.getLocationOnScreen(bottomLineLocation);
+                int x = bottomLineLocation[0];
+                Logger.d("Bottom Line Y: " + bottomLineY);
+                topLineView.getLocationOnScreen(topLineLocation);*/
+                int bottomLineY = windowLineLocations[3];
+                int topLineY = windowLineLocations[1];
+
+                resetBitmapColor();
+
+                transparentRect.top = topLineY + 90;
+                transparentRect.bottom = bottomLineY + 15;
+
+                if (getTouchedViewId() == R.id.topLine_zoomLineView) {
+                    defaultRectangleHeight = transparentRect.height();
+
+                    Bundle bundle = new Bundle();
+                    bundle.putString("Bottom_Line_Zoom", "Bottom Line Zoomed to:" + bottomLineY);
+                    bundle.putString("New_Rectangle_Height", "New rectangle height: " + defaultRectangleHeight);
+                    mFirebaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
+                }
+                if (backgroundType != null) {
+                    if (!backgroundType.equals("color")) {
+                        privacyShadeCanvas = new Canvas(privacyShadeBitmap);
+                        privacyShadeCanvas.drawBitmap(privacyShadeBitmap, matrix, null);
+                        privacyShadeCanvas.drawRect(transparentRect, transparentPaint);
+                        bitmapDrawable = new BitmapDrawable(getResources(), privacyShadeBitmap);
+                    } else {
+                        privacyShadeCanvas.drawRect(transparentRect, transparentPaint);
+                        bitmapDrawable = new BitmapDrawable(getResources(), privacyShadeBitmap);
+                    }
+                }
+
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        privacyShadeImageView.setImageBitmap(privacyShadeBitmap);
+                    }
+                });
+
+            }
+        };
+
+        topLineThread = new Thread(topLineRunnable);
+        bottomLineThread = new Thread(bottomLineRunnable);
+    }
+
+    private int[] getWindowLineLocations() {
+        int[] bottomLineLocation = new int[2];
+        int[] topLineLocation = new int[2];
+        topLineView.getLocationOnScreen(topLineLocation);
+        bottomLineView.getLocationOnScreen(bottomLineLocation);
+        return ArrayUtils.combineIntArrays(topLineLocation, bottomLineLocation);
+    }
+
+    /*private void onInviteClicked() {
         Intent intent = new AppInviteInvitation.IntentBuilder(getString(R.string.invitation_title))
                 .setMessage(getString(R.string.invitation_message))
                 .setDeepLink(Uri.parse(getString(R.string.invitation_deep_link)))
@@ -1114,7 +1237,7 @@ public class PrivacyShadeService extends Service {
                 .setCallToActionText(getString(R.string.invitation_cta))
                 .build();
         //startActivityForResult(intent, REQUEST_INVITE);
-    }
+    }*/
 
     @Subscribe
     public void hideScreen(OnScreenLockEvent onScreenLockEvent) {
@@ -1173,10 +1296,6 @@ public class PrivacyShadeService extends Service {
         }
     }
 
-    private void createVinylBitmap() {
-
-    }
-
     private void openFeedbackTab() {
         mCustomTabsServiceConnection = new CustomTabsServiceConnection() {
             @Override
@@ -1225,11 +1344,10 @@ public class PrivacyShadeService extends Service {
                 switch (getShapeType()) {
                     case CIRCLE:
                         changeShape(ShapeType.CIRCLE);
-                        //toggleCircleButton.setImageResource(R.drawable.ic_panorama_fish_eye_white_24dp);
+
                         break;
                     case RECTANGLE:
                         changeShape(ShapeType.RECTANGLE);
-                        //toggleCircleButton.setImageResource(R.drawable.ic_crop_5_4_white_24dp);
                         break;
                 }
             }
@@ -1248,31 +1366,14 @@ public class PrivacyShadeService extends Service {
             switch (getShapeType()) {
                 case CIRCLE:
                     changeShape(ShapeType.CIRCLE);
-                    //toggleCircleButton.setImageResource(R.drawable.ic_panorama_fish_eye_white_24dp);
                     break;
                 case RECTANGLE:
                     changeShape(ShapeType.RECTANGLE);
-                    //toggleCircleButton.setImageResource(R.drawable.ic_crop_5_4_white_24dp);
                     break;
             }
 
         }
 
-    }
-
-    private void showFirstTimeWalkThrough() {
-
-        /*
-        Step 1: Describe zoom and drag buttons
-        Step 2: Describe hamburger menu
-        Step 3: Save to preferences
-         */
-
-        ToolTip.Builder builder = new ToolTip.Builder(this, bottomLineDragView, bottomLineView, "Press these to drag the window", ToolTip.POSITION_BELOW);
-        builder.setBackgroundColor(getResources().getColor(R.color.accent));
-        mToolTipsManager.show(builder.build());
-        mToolTipsManager.findAndDismiss(bottomLineDragView);
-        preferences.edit().putBoolean("isFirstTime", false).apply();
     }
 
     private void changeShape(ShapeType shapeType) {
@@ -1318,8 +1419,14 @@ public class PrivacyShadeService extends Service {
     }
 
     private void resetBitmapColor() {
-        privacyShadeBitmap.eraseColor(ContextCompat.getColor(getApplicationContext(), R.color.black));
-        //privacyShadeBitmap = Bitmap.createBitmap(scaledBitmap, 0, 0, screenWidth, screenHeight);
+        if (backgroundType != null) {
+            if (backgroundType.equals("color")) {
+                privacyShadeBitmap.eraseColor(ContextCompat.getColor(getApplicationContext(), R.color.black));
+            } else {
+                privacyShadeBitmap = Bitmap.createBitmap(scaledBitmap, 0, 0, screenWidth, screenHeight);
+            }
+        }
+
     }
 
     private void resetPosition(int x_cord_now) {
@@ -1395,7 +1502,7 @@ public class PrivacyShadeService extends Service {
                 }
             }
         }
-        return START_STICKY;
+        return START_NOT_STICKY;
     }
 
     /*@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP_MR1)
@@ -1454,18 +1561,34 @@ public class PrivacyShadeService extends Service {
 
     // Run service in foreground so it is less likely to be killed by system
     private void startForegroundService() {
+        boolean shouldShowStatusBarIcon = preferences.getBoolean("should_show_notification_icon", false);
         Intent stopServiceIntent = new Intent(this, PrivacyShadeService.class);
+        int icon;
+
         stopServiceIntent.setAction(Constants.STOPFOREGROUND_ACTION);
         PendingIntent stopServicePendingIntent = PendingIntent.getService(this, 0, stopServiceIntent, PendingIntent.FLAG_CANCEL_CURRENT);
-
-        Notification notification = new NotificationCompat.Builder(this)
-                .setContentTitle(getResources().getString(R.string.app_name) + " " + getResources().getString(R.string.notification_joiner_shade_is_on))
-                .setContentText(getResources().getString(R.string.notification_turn_off_shade))
-                .setSmallIcon(android.R.color.transparent)
-                .setContentIntent(stopServicePendingIntent)
-                .setOngoing(true)
-                .setAutoCancel(false)
-                .build();
+        Notification notification;
+        if (shouldShowStatusBarIcon) {
+            notification = new NotificationCompat.Builder(this)
+                    .setContentTitle(getResources().getString(R.string.app_name) + " " + getResources().getString(R.string.notification_joiner_shade_is_on))
+                    .setContentText(getResources().getString(R.string.notification_turn_off_shade))
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setLargeIcon(BitmapFactory.decodeResource(getApplicationContext().getResources(),
+                            R.drawable.ic_stat_security))
+                    .setContentIntent(stopServicePendingIntent)
+                    .setOngoing(true)
+                    .setAutoCancel(false)
+                    .build();
+        } else {
+            notification = new NotificationCompat.Builder(this)
+                    .setContentTitle(getResources().getString(R.string.app_name) + " " + getResources().getString(R.string.notification_joiner_shade_is_on))
+                    .setContentText(getResources().getString(R.string.notification_turn_off_shade))
+                    .setSmallIcon(android.R.color.transparent)
+                    .setContentIntent(stopServicePendingIntent)
+                    .setOngoing(true)
+                    .setAutoCancel(false)
+                    .build();
+        }
         startForeground(9999, notification);
     }
 
@@ -1506,6 +1629,20 @@ public class PrivacyShadeService extends Service {
             windowManager.removeView(circleZoomView);
         }
 
+        if (isFirstTimeOpen) {
+            if (menuHelpRelativeLayout != null) {
+                windowManager.removeView(menuHelpRelativeLayout);
+            }
+
+            if (dragHelpRelativeLayout != null) {
+                windowManager.removeView(dragHelpRelativeLayout);
+            }
+
+            if (zoomHelpRelativeLayout != null) {
+                windowManager.removeView(zoomHelpRelativeLayout);
+            }
+        }
+
         try {
             endTime = getCurrentTime();
             Bundle bundle = new Bundle();
@@ -1528,8 +1665,30 @@ public class PrivacyShadeService extends Service {
             unregisterReceiver(screenLockReceiver);
         }
 
+        /*int numberOfTimesOpened = preferences.getInt("launchCount",0);
+
+        Logger.d("Number of times opened: " + numberOfTimesOpened);
+        if(numberOfTimesOpened == 3){
+            Intent i = new Intent(PrivacyShadeService.this, RatingsActivity.class);
+            i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+        }*/
+
         Process.killProcess(Process.myPid());
     }
+
+    /*private void fadeOutRectangleWindow(){
+        Animation animationFadeOut = AnimationUtils.loadAnimation(this, R.anim.animation_fade_out);
+        bottomLineDragView.startAnimation(animationFadeOut);
+        topLineDragView.startAnimation(animationFadeOut);
+
+    }*/
+
+    /*private void fadeInRectangleWindow(){
+         Animation animationFadeIn = AnimationUtils.loadAnimation(this, R.anim.animation_fade_in);
+        bottomLineDragView.startAnimation(animationFadeIn);
+        topLineDragView.startAnimation(animationFadeIn);
+    }*/
 
     private void startActiveNotificationService() {
         Logger.d("PrivacyShadeService.onStop, starting notification service");
@@ -1561,8 +1720,6 @@ public class PrivacyShadeService extends Service {
     public void setDefaultOpacity(float defaultOpacity) {
         this.defaultOpacity = defaultOpacity;
     }
-
-    public enum backgroundType {COLOR, IMAGE, VINYL}
 
     private enum ShapeType {RECTANGLE, CIRCLE}
 

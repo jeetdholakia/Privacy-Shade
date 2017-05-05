@@ -1,7 +1,5 @@
 package com.sand5.privacyscreen.utils;
 
-import com.orhanobut.logger.Logger;
-
 import java.util.ArrayList;
 
 /**
@@ -16,7 +14,6 @@ public class ImageUrlHelper {
         ArrayList<String> urlList = new ArrayList<>();
         for (int i = 1; i < 11; i++) {
             String url = baseUrl + i + ".jpg";
-            Logger.d("Url is: " + url);
             urlList.add(url);
         }
         return urlList;
