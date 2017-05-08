@@ -35,7 +35,6 @@ import android.support.customtabs.CustomTabsIntent;
 import android.support.customtabs.CustomTabsServiceConnection;
 import android.support.customtabs.CustomTabsSession;
 import android.support.v4.content.ContextCompat;
-import android.support.v4.view.animation.FastOutSlowInInterpolator;
 import android.support.v7.app.NotificationCompat;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -70,9 +69,6 @@ import com.sand5.privacyscreen.utils.ServiceBootstrap;
 import com.sand5.privacyscreen.utils.VisibleToggleClickListener;
 import com.squareup.otto.Bus;
 import com.squareup.otto.Subscribe;
-import com.transitionseverywhere.Fade;
-import com.transitionseverywhere.Transition;
-import com.transitionseverywhere.TransitionManager;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -90,19 +86,20 @@ import static com.sand5.privacyscreen.utils.DisplayUtils.pxToDp;
 
 public class PrivacyShadeService extends Service {
 
+    // TODO: 5/6/17 Fix sporadic touches
+    // TODO: 5/6/17 Move everything to settings/ new activity
     // TODO: 4/17/17 Walk-through
     // TODO: 5/3/17 Custom imageView with canvas
-    // TODO: 4/28/17 Decode bitmaps as per aspect ratio
     // TODO: 4/22/17 Vinyl Store IAP
     // TODO: 4/24/17 Make menu movable
-    // TODO: 4/26/17 Add fire base invites
+    // TODO: 4/26/17 Add Fire Base invites
     // TODO: 5/2/17 Add color/vinyl/wallpaper selector
-    // TODO: 5/3/17 Auto night-mode/auto dim after touch
-    // TODO: 5/3/17 Permission for read/write storage
+    // TODO: 5/3/17 Auto night-mode
     // TODO: 5/3/17 Check network settings in vinyl activity
     // TODO: 5/3/17 Load bitmap asynchronously
     // TODO: 5/3/17 Ratings Activity
     // TODO: 5/3/17 Find new Vinyls
+    // TODO: 5/6/17 Generate vinyl thumbnails
 
     public static boolean isRunning = false;
     static String endTime;
@@ -159,14 +156,13 @@ public class PrivacyShadeService extends Service {
     private LinearLayout brightnessSeekBarHolderLayout;
     private Matrix matrix = new Matrix();
     private BitmapDrawable bitmapDrawable;
-    private FirebaseAnalytics mFirebaseAnalytics;
+    private FirebaseAnalytics mFireBaseAnalytics;
     private Handler handler;
     private int touchedViewId;
     private ImageView privacyShadeImageView;
     private RelativeLayout zoomHelpRelativeLayout;
     private RelativeLayout dragHelpRelativeLayout;
     private RelativeLayout menuHelpRelativeLayout;
-
     View.OnTouchListener bottomLineTouchListener = new View.OnTouchListener() {
 
         int numberOfFingers;
@@ -225,7 +221,7 @@ public class PrivacyShadeService extends Service {
 
                             Bundle bundle = new Bundle();
                             bundle.putString("Bottom_Line_Dragged_to", "" + y_cord_Destination);
-                            mFirebaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
+                            mFireBaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
 
                             topLineLayoutParams.x = x_cord_Destination;
                             topLineLayoutParams.y = y_cord_Destination - defaultRectangleHeight - 90;
@@ -240,7 +236,7 @@ public class PrivacyShadeService extends Service {
                 case MotionEvent.ACTION_UP:
                     Bundle bundle = new Bundle();
                     bundle.putString("Rectangle_Position", "Rectangle Position at time: " + getCurrentTime() + "\t" + getCurrentDate() + "\n Top: " + transparentRect.top + "\n Left: " + transparentRect.left + "\n Bottom: " + transparentRect.bottom + "\n Right: " + transparentRect.right);
-                    mFirebaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
+                    mFireBaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
                     // handler.removeCallbacks(bottomLineRunnable);
                     // fadeOutRectangleWindow();
                     break;
@@ -306,7 +302,7 @@ public class PrivacyShadeService extends Service {
 
                         Bundle bundle = new Bundle();
                         bundle.putString("Top_Line_Drag", "Top Line Dragged to:" + y_cord_Destination);
-                        mFirebaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
+                        mFireBaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
 
                         bottomLineLayoutParams.x = x_cord_Destination;
                         bottomLineLayoutParams.y = y_cord_Destination + defaultRectangleHeight + 90;
@@ -319,7 +315,7 @@ public class PrivacyShadeService extends Service {
                     // handler.removeCallbacks(topLineRunnable);
                     Bundle bundle = new Bundle();
                     bundle.putString("Rectangle_Position", "Rectangle Position at time: " + getCurrentTime() + "\t" + getCurrentDate() + "\n Top: " + transparentRect.top + "\n Left: " + transparentRect.left + "\n Bottom: " + transparentRect.bottom + "\n Right: " + transparentRect.right);
-                    mFirebaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
+                    mFireBaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
 
                     //fadeOutRectangleWindow();
 
@@ -330,12 +326,10 @@ public class PrivacyShadeService extends Service {
             return true;
         }
     };
-
     private int defaultCircleDiameter = dpToPx(150);
     private RelativeLayout circlePullView;
     private RelativeLayout circleZoomView;
     private String backgroundType;
-
     View.OnTouchListener circleEyeTouchListener = new View.OnTouchListener() {
 
         int x_cord_Destination, y_cord_Destination;
@@ -407,7 +401,7 @@ public class PrivacyShadeService extends Service {
                 case MotionEvent.ACTION_UP:
                     Bundle bundle = new Bundle();
                     bundle.putString("Circle_Drag", "Circle dragged to at time: " + getCurrentTime() + "\t" + getCurrentDate() + "\n Diameter: " + circleViewParams.width + "\n X: " + circleViewParams.x + "\n Y: " + circleViewParams.y);
-                    mFirebaseAnalytics.logEvent("Circle_Motion_Events", bundle);
+                    mFireBaseAnalytics.logEvent("Circle_Motion_Events", bundle);
                     break;
                 default:
                     break;
@@ -505,7 +499,7 @@ public class PrivacyShadeService extends Service {
                     defaultCircleDiameter = circleView.getWidth();
                     Bundle bundle = new Bundle();
                     bundle.putString("Circle_Zoom", "Circle zoomed to at time: " + getCurrentTime() + "\t" + getCurrentDate() + "\n Diameter: " + defaultCircleDiameter + "\n X: " + circleViewParams.x + "\n Y: " + circleViewParams.y);
-                    mFirebaseAnalytics.logEvent("Circle_Motion_Events", bundle);
+                    mFireBaseAnalytics.logEvent("Circle_Motion_Events", bundle);
                     break;
                 default:
                     break;
@@ -513,7 +507,6 @@ public class PrivacyShadeService extends Service {
             return true;
         }
     };
-
     private ImageButton toggleCircleButton;
     private ShapeType shapeType;
     private BroadcastReceiver screenLockReceiver;
@@ -534,9 +527,8 @@ public class PrivacyShadeService extends Service {
         Bus bus = PrivacyScreenApplication.bus;
         bus.register(this);
         FirebaseApp.initializeApp(this);
-
         Logger.d("PrivacyShadeService.onCreate()");
-        mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
+        mFireBaseAnalytics = FirebaseAnalytics.getInstance(this);
         preferences = PrivacyScreenApplication.getInstance().getSharedPreferences();
         initializeThreads();
     }
@@ -553,7 +545,7 @@ public class PrivacyShadeService extends Service {
         currentDate = getCurrentDate();
         Bundle bundle = new Bundle();
         bundle.putString("Start_time", "Overlay started at time: " + startTime + "on " + currentDate);
-        mFirebaseAnalytics.logEvent("Lifecycle_Events", bundle);
+        mFireBaseAnalytics.logEvent("Lifecycle_Events", bundle);
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         inflater = (LayoutInflater) getSystemService(LAYOUT_INFLATER_SERVICE);
@@ -611,7 +603,7 @@ public class PrivacyShadeService extends Service {
         transparentPaint.setColor(Color.TRANSPARENT);
         transparentPaint.setAntiAlias(true);
 
-        backgroundType = "color";//preferences.getString("background_type","color");
+        backgroundType = preferences.getString("background_type", "color");
 
         if (backgroundType.equals("color")) {
             Logger.d("Background type is color");
@@ -804,7 +796,7 @@ public class PrivacyShadeService extends Service {
             public void onClick(View v) {
                 Bundle bundle = new Bundle();
                 bundle.putString("Menu_Events", "Share button clicked");
-                mFirebaseAnalytics.logEvent("Menu_Events", bundle);
+                mFireBaseAnalytics.logEvent("Menu_Events", bundle);
 
                 try {
                     Intent i = new Intent(Intent.ACTION_SEND);
@@ -829,7 +821,7 @@ public class PrivacyShadeService extends Service {
                 Logger.d("Settings button clicked");
                 Bundle bundle = new Bundle();
                 bundle.putString("Menu_Events", "Settings opened");
-                mFirebaseAnalytics.logEvent("Menu_Events", bundle);
+                mFireBaseAnalytics.logEvent("Menu_Events", bundle);
                 stopSelf();
                 Intent i = new Intent(PrivacyShadeService.this, SettingsActivity.class);
                 i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -844,7 +836,7 @@ public class PrivacyShadeService extends Service {
             public void onClick(View v) {
                 Bundle bundle = new Bundle();
                 bundle.putString("Menu_Events", "Remove shade button clicked");
-                mFirebaseAnalytics.logEvent("Menu_Events", bundle);
+                mFireBaseAnalytics.logEvent("Menu_Events", bundle);
                 isClosedBeforeLock = true;
                 stopSelf();
             }
@@ -855,7 +847,7 @@ public class PrivacyShadeService extends Service {
             public void onClick(View v) {
                 Bundle bundle = new Bundle();
                 bundle.putString("Menu_Events", "Submit Feedback button clicked");
-                mFirebaseAnalytics.logEvent("Menu_Events", bundle);
+                mFireBaseAnalytics.logEvent("Menu_Events", bundle);
                 hideHamburgerMenu();
                 stopSelf();
                 openFeedbackTab();
@@ -882,21 +874,33 @@ public class PrivacyShadeService extends Service {
         toggleBrightnessSeekBarButton.setOnClickListener(new VisibleToggleClickListener() {
             @Override
             protected void changeVisibility(boolean visible) {
+
+            }
+        });
+
+        toggleBrightnessSeekBarButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                boolean visible = brightnessSeekBarHolderLayout.getVisibility() == View.VISIBLE;
                 String filler;
                 if (visible) {
+                    brightnessSeekBarHolderLayout.setVisibility(View.GONE);
                     filler = "opened";
                 } else {
                     filler = "closed";
+                    brightnessSeekBarHolderLayout.setVisibility(View.VISIBLE);
                 }
+
                 Bundle bundle = new Bundle();
                 bundle.putString("Menu_Events", "Brightness bar " + filler);
-                mFirebaseAnalytics.logEvent("Menu_Events", bundle);
+                mFireBaseAnalytics.logEvent("Menu_Events", bundle);
 
-                Transition fadeTransition = new Fade();
+                /*Transition fadeTransition = new Fade();
                 fadeTransition.setDuration(400);
                 fadeTransition.setInterpolator(new FastOutSlowInInterpolator());
                 TransitionManager.beginDelayedTransition(brightnessSeekBarView, fadeTransition);
-                brightnessSeekBarHolderLayout.setVisibility(visible ? View.VISIBLE : View.GONE);
+                brightnessSeekBarHolderLayout.setVisibility(visible ? View.VISIBLE : View.GONE);*/
+
                 hideHamburgerMenu();
             }
         });
@@ -906,7 +910,7 @@ public class PrivacyShadeService extends Service {
             public void onClick(View v) {
                 Bundle bundle = new Bundle();
                 bundle.putString("Menu_Events", "Shape Change button opened");
-                mFirebaseAnalytics.logEvent("Menu_Events", bundle);
+                mFireBaseAnalytics.logEvent("Menu_Events", bundle);
                 switch (getShapeType()) {
                     case CIRCLE:
                         changeShape(ShapeType.RECTANGLE);
@@ -970,7 +974,7 @@ public class PrivacyShadeService extends Service {
         Bundle bundle = new Bundle();
         bundle.putString("Window_Events", "Selected Circle shape");
 
-        mFirebaseAnalytics.logEvent("Window_Events", bundle);
+        mFireBaseAnalytics.logEvent("Window_Events", bundle);
         if (toggleCircleButton != null) {
             toggleCircleButton.setImageResource(R.drawable.ic_crop_5_4_white_24dp);
         }
@@ -1079,7 +1083,7 @@ public class PrivacyShadeService extends Service {
 
         Bundle bundle = new Bundle();
         bundle.putString("Opacity", "Opacity at " + getCurrentTime() + "\t" + getCurrentDate() + "is: " + progressBar);
-        mFirebaseAnalytics.logEvent("Customization_Events", bundle);
+        mFireBaseAnalytics.logEvent("Customization_Events", bundle);
 
         brightnessSeekBar.setProgress(progressBar);
 
@@ -1103,7 +1107,7 @@ public class PrivacyShadeService extends Service {
             public void onStopTrackingTouch(SeekBar seekBar) {
                 Bundle bundle = new Bundle();
                 bundle.putString("Opacity", "Opacity changed at " + getCurrentTime() + "\t" + getCurrentDate() + "to: " + (100 - Math.round(getDefaultOpacity() * 100)));
-                mFirebaseAnalytics.logEvent("Customization_Events", bundle);
+                mFireBaseAnalytics.logEvent("Customization_Events", bundle);
 
                 final Handler h = new Handler();
                 Runnable r1 = new Runnable() {
@@ -1145,7 +1149,7 @@ public class PrivacyShadeService extends Service {
                     Bundle bundle = new Bundle();
                     bundle.putString("Bottom_Line_Dragged_to", "Bottom Line Zoomed to:" + bottomLineY);
                     bundle.putString("New_Rectangle_height", "" + defaultRectangleHeight);
-                    mFirebaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
+                    mFireBaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
                 }
 
                 if (backgroundType != null) {
@@ -1193,7 +1197,7 @@ public class PrivacyShadeService extends Service {
                     Bundle bundle = new Bundle();
                     bundle.putString("Bottom_Line_Zoom", "Bottom Line Zoomed to:" + bottomLineY);
                     bundle.putString("New_Rectangle_Height", "New rectangle height: " + defaultRectangleHeight);
-                    mFirebaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
+                    mFireBaseAnalytics.logEvent("Rectangle_Motion_Events", bundle);
                 }
                 if (backgroundType != null) {
                     if (!backgroundType.equals("color")) {
@@ -1244,7 +1248,7 @@ public class PrivacyShadeService extends Service {
         Logger.d("Screen Locked Otto");
         Bundle bundle = new Bundle();
         bundle.putString("Hide_Screen_Lock", "Hide screen: " + getCurrentTime());
-        mFirebaseAnalytics.logEvent("Lifecycle_Events", bundle);
+        mFireBaseAnalytics.logEvent("Lifecycle_Events", bundle);
         privacyShadeView.setVisibility(View.GONE);
         menuParent.setVisibility(View.GONE);
         brightnessSeekBarHolderLayout.setVisibility(View.GONE);
@@ -1270,7 +1274,7 @@ public class PrivacyShadeService extends Service {
         Logger.d("Screen Unlocked Otto");
         Bundle bundle = new Bundle();
         bundle.putString("Show_Screen_Lock", "Show screen: " + getCurrentTime());
-        mFirebaseAnalytics.logEvent("Lifecycle_Events", bundle);
+        mFireBaseAnalytics.logEvent("Lifecycle_Events", bundle);
         privacyShadeView.setVisibility(View.VISIBLE);
         menuParent.setVisibility(View.VISIBLE);
         switch (getShapeType()) {
@@ -1312,7 +1316,6 @@ public class PrivacyShadeService extends Service {
         };
 
         CustomTabsClient.bindCustomTabsService(this, CUSTOM_TAB_PACKAGE_NAME, mCustomTabsServiceConnection);
-
 
         mCustomTabsIntent = new CustomTabsIntent.Builder(mCustomTabsSession)
                 .addDefaultShareMenuItem()
@@ -1523,7 +1526,7 @@ public class PrivacyShadeService extends Service {
     private void handleCallReceived() {
         Bundle bundle = new Bundle();
         bundle.putString("Call_Events", "Call received at:" + getCurrentTime() + "on: " + getCurrentDate());
-        mFirebaseAnalytics.logEvent("Call_Events", bundle);
+        mFireBaseAnalytics.logEvent("Call_Events", bundle);
         Logger.d("Call received in service");
         if (windowManager != null & privacyShadeParams != null) {
             privacyShadeParams.alpha = 0.1f;
@@ -1534,7 +1537,7 @@ public class PrivacyShadeService extends Service {
     private void handleCallEnded() {
         Bundle bundle = new Bundle();
         bundle.putString("Call_Events", "Call ended at:" + getCurrentTime() + "on: " + getCurrentDate());
-        mFirebaseAnalytics.logEvent("Call_Events", bundle);
+        mFireBaseAnalytics.logEvent("Call_Events", bundle);
         Logger.d("Call ended in service");
         if (windowManager != null & privacyShadeParams != null) {
             privacyShadeParams.alpha = getDefaultOpacity();
@@ -1648,7 +1651,7 @@ public class PrivacyShadeService extends Service {
             Bundle bundle = new Bundle();
             bundle.putString("Stop_Time", endTime);
             bundle.putString("Total_Usage_time", getTimeDifference(startTime, endTime));
-            mFirebaseAnalytics.logEvent("Lifecycle_Events", bundle);
+            mFireBaseAnalytics.logEvent("Lifecycle_Events", bundle);
         } catch (Exception exception) {
             FirebaseCrash.report(exception);
         }

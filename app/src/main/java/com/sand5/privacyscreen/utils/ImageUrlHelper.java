@@ -12,7 +12,7 @@ public class ImageUrlHelper {
 
     public static ArrayList<String> getImageUrls() {
         ArrayList<String> urlList = new ArrayList<>();
-        for (int i = 1; i < 11; i++) {
+        for (int i = 1; i < 18; i++) {
             String url = baseUrl + i + ".jpg";
             urlList.add(url);
         }

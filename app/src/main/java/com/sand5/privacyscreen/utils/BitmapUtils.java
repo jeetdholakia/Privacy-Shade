@@ -3,7 +3,9 @@ package com.sand5.privacyscreen.utils;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.Matrix;
+import android.graphics.Paint;
 import android.os.Environment;
 import android.support.annotation.NonNull;
 
@@ -21,21 +23,29 @@ import java.io.File;
 
 public class BitmapUtils {
 
-    public static Bitmap getScaledBitmap(Bitmap bm, int newWidth, int newHeight) {
-        int width = bm.getWidth();
-        int height = bm.getHeight();
-        float scaleWidth = ((float) newWidth) / width;
-        float scaleHeight = ((float) newHeight) / height;
+    public static Bitmap getScaledBitmap(Bitmap originalImage, int width, int height) {
+        Bitmap background = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
 
-        // Create a matrix for the manipulation
-        Matrix matrix = new Matrix();
+        float originalWidth = originalImage.getWidth();
+        float originalHeight = originalImage.getHeight();
 
-        // Resize the bit map
-        matrix.postScale(scaleWidth, scaleHeight);
+        Canvas canvas = new Canvas(background);
 
-        // Recreate the new Bitmap
+        float scale = width / originalWidth;
 
-        return Bitmap.createBitmap(bm, 0, 0, width, height, matrix, false);
+        float xTranslation = 0.0f;
+        float yTranslation = (height - originalHeight * scale) / 2.0f;
+
+        Matrix transformation = new Matrix();
+        transformation.postTranslate(xTranslation, yTranslation);
+        transformation.preScale(scale, scale);
+
+        Paint paint = new Paint();
+        paint.setFilterBitmap(true);
+
+        canvas.drawBitmap(originalImage, transformation, paint);
+
+        return background;
     }
 
     public static Bitmap decodeSampledBitmapFromResource(Resources res, int resId,

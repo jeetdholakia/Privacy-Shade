@@ -1,21 +1,20 @@
 package com.sand5.privacyscreen.activities;
 
+import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.support.annotation.NonNull;
+import android.support.design.widget.TabLayout;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentPagerAdapter;
+import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.GridLayoutManager;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.View;
-import android.widget.ImageView;
 import android.widget.Toast;
 
 import com.anjlab.android.iab.v3.BillingProcessor;
@@ -29,55 +28,50 @@ import com.facebook.login.LoginManager;
 import com.facebook.login.LoginResult;
 import com.facebook.login.widget.LoginButton;
 import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FacebookAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.storage.FileDownloadTask;
 import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
 import com.orhanobut.logger.Logger;
 import com.sand5.privacyscreen.PrivacyScreenApplication;
 import com.sand5.privacyscreen.R;
-import com.sand5.privacyscreen.adapters.VinylAdapter;
 import com.sand5.privacyscreen.fragments.BackgroundFragment;
 import com.sand5.privacyscreen.fragments.ColorFragment;
 import com.sand5.privacyscreen.fragments.VinylFragment;
 import com.sand5.privacyscreen.utils.Constants;
-import com.sand5.privacyscreen.utils.ImageUrlHelper;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
+import pub.devrel.easypermissions.AfterPermissionGranted;
+import pub.devrel.easypermissions.EasyPermissions;
 
 public class VinylActivity extends AppCompatActivity implements BillingProcessor.IBillingHandler, BackgroundFragment.OnFragmentInteractionListener, VinylFragment.OnFragmentInteractionListener, ColorFragment.OnFragmentInteractionListener {
 
+    private final int PERMISSION_WRITE_STORAGE = 501;
     BillingProcessor bp;
     FirebaseStorage firebaseStorage;
-
-    @BindView(R.id.test_imageView)
-    ImageView testImageView;
-
     @BindView(R.id.login_button)
     LoginButton loginButton;
-
-    @BindView(R.id.activity_vinyl_images_recyclerView)
-    RecyclerView vinylImagesRecyclerView;
-
+    @BindView(R.id.tabs)
+    TabLayout tabLayout;
+    @BindView(R.id.viewpager)
+    ViewPager viewPager;
     private FirebaseAuth mAuth;
     private CallbackManager callbackManager;
     private String TAG = "VinylActivity";
     private AccessToken accessToken;
     private SharedPreferences preferences;
-
+    private int[] tabIcons = {
+            R.drawable.ic_landscape_white_24dp,
+            R.drawable.ic_text_background_24dp,
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,6 +80,7 @@ public class VinylActivity extends AppCompatActivity implements BillingProcessor
         ButterKnife.bind(this);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+
         mAuth = FirebaseAuth.getInstance();
         preferences = PrivacyScreenApplication.getInstance().getSharedPreferences();
         bp = new BillingProcessor(this, Constants.billingID, this);
@@ -94,7 +89,10 @@ public class VinylActivity extends AppCompatActivity implements BillingProcessor
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
             loginButton.setVisibility(View.GONE);
-            downloadVinyls();
+            setupViewPager(viewPager);
+            tabLayout.setupWithViewPager(viewPager);
+            setupTabIcons();
+            //checkPermissionAndDownloadVinyl();
         }
 
         callbackManager = CallbackManager.Factory.create();
@@ -133,28 +131,7 @@ public class VinylActivity extends AppCompatActivity implements BillingProcessor
     }
 
 
-    private void downloadVinyls() {
-        Logger.d("Downloading vinyls...");
-        vinylImagesRecyclerView.setVisibility(View.VISIBLE);
-        vinylImagesRecyclerView.setHasFixedSize(false);
-        LinearLayoutManager lm = new LinearLayoutManager(this);
-        lm.setOrientation(LinearLayoutManager.VERTICAL);
-        vinylImagesRecyclerView.setLayoutManager(new GridLayoutManager(this, 2));
 
-        final ArrayList<String> urlList = ImageUrlHelper.getImageUrls();
-        VinylAdapter vinylAdapter = new VinylAdapter(this, urlList, firebaseStorage);
-        vinylImagesRecyclerView.setAdapter(vinylAdapter);
-        vinylAdapter.setOnItemClickListener(new VinylAdapter.OnItemClickListener() {
-            @Override
-            public void onItemClick(View view, int position) {
-                Logger.d("Clicked");
-                preferences.edit().putString("background_type", "wallpaper").apply();
-                preferences.edit().putString("wallpaper_url", urlList.get(position)).apply();
-                downloadVinylToFile(urlList.get(position));
-
-            }
-        });
-    }
 
     @Override
     public void onBackPressed() {
@@ -191,7 +168,10 @@ public class VinylActivity extends AppCompatActivity implements BillingProcessor
                             Log.d(TAG, "signInWithCredential:success");
                             FirebaseUser user = mAuth.getCurrentUser();
                             loginButton.setVisibility(View.GONE);
-                            downloadVinyls();
+                            setupViewPager(viewPager);
+                            tabLayout.setupWithViewPager(viewPager);
+                            setupTabIcons();
+                            //checkPermissionAndDownloadVinyl();
                             //updateUI(user);
                         } else {
                             // If sign in fails, display a message to the user.
@@ -204,43 +184,7 @@ public class VinylActivity extends AppCompatActivity implements BillingProcessor
                 });
     }
 
-    // TODO: 5/2/17 Check file storage access permission here
-    private void downloadVinylToFile(String url) {
-        StorageReference storageReference = firebaseStorage.getReferenceFromUrl(url);
-        try {
-            File rootPath = new File(Environment.getExternalStorageDirectory(), "Privacy Shade Wallpapers");
-            if (!rootPath.exists()) {
-                rootPath.mkdirs();
-            }
-            final File localFile = new File(rootPath, "wallpaper.jpg");
-            storageReference.getFile(localFile).addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
-                @Override
-                public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
-                    Logger.d("Success downloading file");
-                    Bitmap bitmap = BitmapFactory.decodeFile(localFile.getAbsolutePath());
-                    if (localFile.exists()) localFile.delete();
-                    try {
-                        FileOutputStream out = new FileOutputStream(localFile);
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out);
-                        out.flush();
-                        out.close();
-                        Logger.d("Success saving file");
-                        openMainActivity();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            }).addOnFailureListener(new OnFailureListener() {
-                @Override
-                public void onFailure(@NonNull Exception exception) {
-                    Logger.d("Failure downloading File");
-                }
-            });
-        } catch (Exception e) {
 
-            e.printStackTrace();
-        }
-    }
 
 
     // IBillingHandler implementation
@@ -291,8 +235,71 @@ public class VinylActivity extends AppCompatActivity implements BillingProcessor
         }
     }
 
+    @AfterPermissionGranted(PERMISSION_WRITE_STORAGE)
+    private void checkPermissionAndDownloadVinyl() {
+        String[] perms = {Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE};
+        if (EasyPermissions.hasPermissions(this, perms)) {
+            //downloadVinyls();
+        } else {
+            // Do not have permissions, request them now
+            EasyPermissions.requestPermissions(this, getString(R.string.permission_write_storage),
+                    PERMISSION_WRITE_STORAGE, perms);
+        }
+    }
+
+    @SuppressWarnings("ConstantConditions")
+    private void setupTabIcons() {
+        tabLayout.getTabAt(0).setIcon(tabIcons[0]);
+        tabLayout.getTabAt(1).setIcon(tabIcons[1]);
+    }
+
+    private void setupViewPager(ViewPager viewPager) {
+        ViewPagerAdapter adapter = new ViewPagerAdapter(getSupportFragmentManager());
+        adapter.addFragment(new BackgroundFragment(), "Black");
+        adapter.addFragment(new BackgroundFragment(), "Inspiration");
+        viewPager.setAdapter(adapter);
+    }
+
     @Override
     public void onFragmentInteraction(Uri uri) {
 
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        // Forward results to EasyPermissions
+        EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this);
+    }
+
+    private class ViewPagerAdapter extends FragmentPagerAdapter {
+        private final List<Fragment> mFragmentList = new ArrayList<>();
+        @SuppressWarnings("MismatchedQueryAndUpdateOfCollection")
+        private final List<String> mFragmentTitleList = new ArrayList<>();
+
+        private ViewPagerAdapter(FragmentManager manager) {
+            super(manager);
+        }
+
+        @Override
+        public Fragment getItem(int position) {
+            return mFragmentList.get(position);
+        }
+
+        @Override
+        public int getCount() {
+            return mFragmentList.size();
+        }
+
+        private void addFragment(Fragment fragment, String title) {
+            mFragmentList.add(fragment);
+            mFragmentTitleList.add(title);
+        }
+
+        @Override
+        public CharSequence getPageTitle(int position) {
+            return null;
+        }
     }
 }

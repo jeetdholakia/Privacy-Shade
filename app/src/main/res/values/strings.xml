@@ -105,4 +105,6 @@
     <string name="walkthrough_drag_text">Touch to drag the window</string>
     <string name="walkthrough_zoom_text">Touch to zoom in and out the window</string>
     <string name="walkthrough_menu_text">Touch to open the menu</string>
+    <string name="title_activity_privacy_screen">PrivacyScreenActivity</string>
+    <string name="permission_write_storage">We need storage access to download the wallpapers</string>
 </resources>

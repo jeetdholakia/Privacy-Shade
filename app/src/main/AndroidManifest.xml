@@ -35,7 +35,6 @@
         android:largeHeap="true"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-
         <meta-data
             android:name="com.facebook.sdk.ApplicationId"
             android:value="@string/facebook_app_id" />
@@ -70,7 +69,6 @@
             android:label="@string/title_activity_vinyl"
             android:screenOrientation="portrait"
             android:theme="@style/DarkAppTheme" />
-
         <activity
             android:name=".activities.RatingsActivity"
             android:screenOrientation="portrait" />
@@ -140,16 +138,20 @@
             android:label="@string/title_activity_feedback_chrome_tab"
             android:screenOrientation="portrait"
             android:theme="@style/AppTheme.NoActionBar" />
-
         <activity
             android:name="com.eggheadgames.aboutbox.activity.AboutActivity"
             android:screenOrientation="portrait"
             android:theme="@style/AppTheme.MaterialAboutActivity">
             <intent-filter>
                 <action android:name="AboutActivity" />
+
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".activities.PrivacyScreenActivity"
+            android:label="@string/title_activity_privacy_screen"
+            android:theme="@style/AppTheme.NoActionBar"></activity>
     </application>
 
 </manifest>
