@@ -89,7 +89,7 @@ public class OnBoardingActivity extends MaterialIntroActivity {
     }
 
     private void finishActivity() {
-        Intent mainActivity = new Intent(this, MainActivity.class);
+        Intent mainActivity = new Intent(this, PrivacyScreenActivity.class);
         startActivity(mainActivity);
         finish();
     }

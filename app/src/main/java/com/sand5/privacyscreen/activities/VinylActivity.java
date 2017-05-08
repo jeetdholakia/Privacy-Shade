@@ -130,20 +130,6 @@ public class VinylActivity extends AppCompatActivity implements BillingProcessor
         checkAccessTokenAndLogin();
     }
 
-
-
-
-    @Override
-    public void onBackPressed() {
-        openMainActivity();
-    }
-
-    private void openMainActivity() {
-        Intent mainActivityIntent = new Intent(VinylActivity.this, MainActivity.class);
-        startActivity(mainActivityIntent);
-        finish();
-    }
-
     private void checkAccessTokenAndLogin() {
         accessToken = AccessToken.getCurrentAccessToken();
         if (accessToken != null) {

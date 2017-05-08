@@ -82,6 +82,7 @@
             android:layout_below="@id/brightness_menu_rippleView"
             android:paddingEnd="16dp"
             android:paddingStart="16dp"
+            android:visibility="gone"
             app:rv_centered="true"
             app:rv_rippleDuration="400">
 
@@ -158,6 +159,7 @@
             android:layout_gravity="end"
             android:paddingEnd="16dp"
             android:paddingStart="16dp"
+            android:visibility="gone"
             app:rv_centered="true"
             app:rv_rippleDuration="400">
 
@@ -195,6 +197,7 @@
             android:layout_gravity="end"
             android:paddingEnd="16dp"
             android:paddingStart="16dp"
+            android:visibility="gone"
             app:rv_centered="true"
             app:rv_rippleDuration="400">
 
@@ -232,6 +235,7 @@
             android:layout_gravity="end"
             android:paddingEnd="16dp"
             android:paddingStart="16dp"
+            android:visibility="gone"
             app:rv_centered="true"
             app:rv_rippleDuration="400">
 

@@ -41,7 +41,7 @@
 
     </style>
 
-    <style name="PreferenceTheme" parent="AppTheme.NoActionBar">
+    <style name="PreferenceTheme" parent="DarkAppTheme">
         <item name="preferenceTheme">@style/PreferenceThemeOverlay.v14.Material</item>
         <item name="alertDialogTheme">@style/Theme.AppCompat.DayNight.Dialog.Alert</item>
     </style>

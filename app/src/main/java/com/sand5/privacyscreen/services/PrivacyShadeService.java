@@ -101,6 +101,17 @@ public class PrivacyShadeService extends Service {
     // TODO: 5/3/17 Find new Vinyls
     // TODO: 5/6/17 Generate vinyl thumbnails
 
+    /**
+     * Focus on the upcoming version -> Ease of use
+     * Removing lag on circle
+     * Handling touches better
+     * Fixing crashes
+     * Widget to switch on/off
+     * Chat head to switch on/off
+     * Auto hide feature
+     * Explore other privacy holes and usages in phone usage (notifications,etc.)
+     */
+
     public static boolean isRunning = false;
     static String endTime;
     static String currentDate;
@@ -129,6 +140,8 @@ public class PrivacyShadeService extends Service {
     int cx, cy, x, y;
     Runnable bottomLineRunnable;
     Runnable topLineRunnable;
+    Runnable circleZoomRunnable;
+    Runnable circleDragRunnable;
     Thread topLineThread;
     Thread bottomLineThread;
     private int screenHeight;
@@ -329,8 +342,7 @@ public class PrivacyShadeService extends Service {
     private int defaultCircleDiameter = dpToPx(150);
     private RelativeLayout circlePullView;
     private RelativeLayout circleZoomView;
-    private String backgroundType;
-    View.OnTouchListener circleEyeTouchListener = new View.OnTouchListener() {
+    View.OnTouchListener circleDragTouchListener = new View.OnTouchListener() {
 
         int x_cord_Destination, y_cord_Destination;
 
@@ -383,7 +395,9 @@ public class PrivacyShadeService extends Service {
                     windowManager.updateViewLayout(circleView, circleViewParams);
                     windowManager.updateViewLayout(circleZoomView, circleZoomViewParams);
 
-                    circleView.post(new Runnable() {
+                    handler.post(circleDragRunnable);
+
+                    /*circleView.post(new Runnable() {
                         @Override
                         public void run() {
                             int[] circleLocation = new int[2];
@@ -396,7 +410,7 @@ public class PrivacyShadeService extends Service {
                             bitmapDrawable = new BitmapDrawable(getResources(), privacyShadeBitmap);
                             privacyShadeView.setBackground(bitmapDrawable);
                         }
-                    });
+                    });*/
                     break;
                 case MotionEvent.ACTION_UP:
                     Bundle bundle = new Bundle();
@@ -409,6 +423,8 @@ public class PrivacyShadeService extends Service {
             return true;
         }
     };
+    private String backgroundType;
+    private int radius;
     View.OnTouchListener circleZoomTouchListener = new View.OnTouchListener() {
 
         int x_cord_Destination, y_cord_Destination;
@@ -482,18 +498,15 @@ public class PrivacyShadeService extends Service {
 
                     circleZoomViewParams.y = y_cord_Destination;
                     windowManager.updateViewLayout(circleZoomView, circleZoomViewParams);
-                    int radius = (defaultCircleDiameter / 2) + y_diff_move;
+                    radius = (defaultCircleDiameter / 2) + y_diff_move;
                     circlePullViewParams.y = y_cord_Destination - (radius * 2) - dpToPx(17);
-
-                    resetBitmapColor();
-                    privacyShadeCanvas.drawCircle(cx, cy, radius, transparentPaint);
-                    bitmapDrawable = new BitmapDrawable(getResources(), privacyShadeBitmap);
-                    privacyShadeView.setBackground(bitmapDrawable);
                     windowManager.updateViewLayout(circlePullView, circlePullViewParams);
                     circleViewParams.height = radius * 2;
                     circleViewParams.width = radius * 2;
 
                     windowManager.updateViewLayout(circleView, circleViewParams);
+
+                    handler.post(circleZoomRunnable);
                     break;
                 case MotionEvent.ACTION_UP:
                     defaultCircleDiameter = circleView.getWidth();
@@ -573,6 +586,7 @@ public class PrivacyShadeService extends Service {
         }
         addPrivacyShadeMenu();
         setUpScreenLockReceiver();
+
         /*if (isFirstTimeOpen) {
             //showFirstTimeWalkThrough();
         }*/
@@ -634,7 +648,7 @@ public class PrivacyShadeService extends Service {
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, // | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
                 PixelFormat.TRANSLUCENT);
         privacyShadeParams.gravity = Gravity.TOP | Gravity.START;
         privacyShadeParams.alpha = getDefaultOpacity();
@@ -655,12 +669,10 @@ public class PrivacyShadeService extends Service {
         }
 
         int top, bottom;
-
         top = transparentRect.top;
         //left = transparentRect.left;
         bottom = transparentRect.bottom;
         //right = transparentRect.right;
-
 
         /*
         Add bottom line to the transparent rectangle
@@ -674,11 +686,10 @@ public class PrivacyShadeService extends Service {
                 WindowManager.LayoutParams.MATCH_PARENT,
                 defaultRectangleBorderWidth * 3,
                 WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,// | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE ,
                 PixelFormat.TRANSLUCENT);
         bottomLineParams.gravity = Gravity.TOP | Gravity.START;
         bottomLineParams.x = 0;
-        //Logger.d("Status Bar height: " + getStatusBarHeight(getApplicationContext()));
         bottomLineParams.y = bottom;
         windowManager.addView(bottomLineView, bottomLineParams);
         bottomLineDragView.setOnTouchListener(bottomLineTouchListener);
@@ -707,9 +718,7 @@ public class PrivacyShadeService extends Service {
     @SuppressLint("InflateParams")
     @SuppressWarnings("deprecation")
     private void showFirstTimeWalkThrough() {
-
         Logger.d("Showing first time walkthrough");
-
         dragHelpRelativeLayout = (RelativeLayout) inflater.inflate(R.layout.layout_walkthrough, null);
         TextView dragHelpTextView = (TextView) dragHelpRelativeLayout.findViewById(R.id.textView_walkThrough);
         dragHelpTextView.setText(getResources().getString(R.string.walkthrough_drag_text));
@@ -754,15 +763,13 @@ public class PrivacyShadeService extends Service {
 
     @SuppressLint("InflateParams")
     private void addPrivacyShadeMenu() {
-
         menuParent = (RelativeLayout) inflater.inflate(R.layout.layout_menu_privacy_shade, null);
         menuView = (RelativeLayout) menuParent.findViewById(R.id.privacyShade_menu_holder);
-
         WindowManager.LayoutParams menuParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, //| WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT);
         menuParams.gravity = Gravity.TOP | Gravity.END;
         menuParams.y = getStatusBarHeight(getApplicationContext()) * 2;
@@ -857,11 +864,9 @@ public class PrivacyShadeService extends Service {
         toggleMenuButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
                 if (isFirstTimeOpen) {
                     removeWalkThroughLayouts();
                 }
-
                 if (menuView.getVisibility() == View.VISIBLE) {
                     menuView.setVisibility(View.GONE);
                 } else {
@@ -1035,7 +1040,7 @@ public class PrivacyShadeService extends Service {
         circlePullViewParams.y = y - dpToPx(20) + dpToPx(3);
 
         ImageView circlePullImageView = (ImageView) circlePullView.findViewById(R.id.circle_pull_imageView);
-        circlePullImageView.setOnTouchListener(circleEyeTouchListener);
+        circlePullImageView.setOnTouchListener(circleDragTouchListener);
         windowManager.addView(circlePullView, circlePullViewParams);
     }
 
@@ -1221,6 +1226,31 @@ public class PrivacyShadeService extends Service {
             }
         };
 
+        circleDragRunnable = new Runnable() {
+            @Override
+            public void run() {
+                int[] circleLocation = new int[2];
+                circleView.getLocationOnScreen(circleLocation);
+                int x = circleLocation[0];
+                int y = circleLocation[1];
+
+                resetBitmapColor();
+                privacyShadeCanvas.drawCircle(x + (circleImageView.getWidth() / 2), y + (circleImageView.getWidth() / 2), circleImageView.getWidth() / 2 - dpToPx(5), transparentPaint);
+                bitmapDrawable = new BitmapDrawable(getResources(), privacyShadeBitmap);
+                privacyShadeImageView.setImageBitmap(privacyShadeBitmap);
+            }
+        };
+
+        circleZoomRunnable = new Runnable() {
+            @Override
+            public void run() {
+                resetBitmapColor();
+                privacyShadeCanvas.drawCircle(cx, cy, radius, transparentPaint);
+                bitmapDrawable = new BitmapDrawable(getResources(), privacyShadeBitmap);
+                privacyShadeView.setBackground(bitmapDrawable);
+            }
+        };
+
         topLineThread = new Thread(topLineRunnable);
         bottomLineThread = new Thread(bottomLineRunnable);
     }
@@ -1331,9 +1361,19 @@ public class PrivacyShadeService extends Service {
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
 
-        int w = windowManager.getDefaultDisplay().getWidth();
-        int h = windowManager.getDefaultDisplay().getHeight();
-        szWindow.set(w, h);
+        int w, h;
+
+        try {
+            w = windowManager.getDefaultDisplay().getWidth();
+            h = windowManager.getDefaultDisplay().getHeight();
+            szWindow.set(w, h);
+        } catch (NullPointerException npe) {
+            windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+            inflater = (LayoutInflater) getSystemService(LAYOUT_INFLATER_SERVICE);
+        } finally {
+            w = windowManager.getDefaultDisplay().getWidth();
+            h = windowManager.getDefaultDisplay().getHeight();
+        }
 
         WindowManager.LayoutParams privacyShadeViewLayoutParams = (WindowManager.LayoutParams) privacyShadeView.getLayoutParams();
 
@@ -1491,7 +1531,6 @@ public class PrivacyShadeService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        //Logger.d("PrivacyShadeService.onStartCommand()");
         if (intent != null) {
             if (intent.getAction() != null) {
                 if (intent.getAction().equals(Constants.STARTFOREGROUND_ACTION)) {
@@ -1545,6 +1584,7 @@ public class PrivacyShadeService extends Service {
         }
     }
 
+
     private void startPrivacyScreenService() {
         handleStart();
         startForegroundService();
@@ -1566,7 +1606,6 @@ public class PrivacyShadeService extends Service {
     private void startForegroundService() {
         boolean shouldShowStatusBarIcon = preferences.getBoolean("should_show_notification_icon", false);
         Intent stopServiceIntent = new Intent(this, PrivacyShadeService.class);
-        int icon;
 
         stopServiceIntent.setAction(Constants.STOPFOREGROUND_ACTION);
         PendingIntent stopServicePendingIntent = PendingIntent.getService(this, 0, stopServiceIntent, PendingIntent.FLAG_CANCEL_CURRENT);

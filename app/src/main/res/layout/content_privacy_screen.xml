@@ -1,11 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     app:layout_behavior="@string/appbar_scrolling_view_behavior"
     tools:context="com.sand5.privacyscreen.activities.PrivacyScreenActivity"
-    tools:showIn="@layout/activity_privacy_screen">
+    tools:showIn="@layout/app_bar_privacy_screen">
 
-</android.support.constraint.ConstraintLayout>
+    <ImageView
+        android:id="@+id/imageview_activity_privacyScreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <Button
+            android:id="@+id/button_start_shade"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/start_privacy_shade" />
+
+        <Button
+            android:id="@+id/button_customize_shade"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/customize" />
+
+        <Button
+            android:id="@+id/button_settings_shade"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings" />
+
+        <Button
+            android:id="@+id/button_feedback_shade"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/send_feedback" />
+
+        <Button
+            android:id="@+id/button_share_shade"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/share_app" />
+
+    </LinearLayout>
+
+
+</RelativeLayout>
