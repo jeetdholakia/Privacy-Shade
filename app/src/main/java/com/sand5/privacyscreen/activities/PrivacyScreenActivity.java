@@ -2,7 +2,6 @@ package com.sand5.privacyscreen.activities;
 
 import android.content.ComponentName;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -11,16 +10,9 @@ import android.support.customtabs.CustomTabsIntent;
 import android.support.customtabs.CustomTabsServiceConnection;
 import android.support.customtabs.CustomTabsSession;
 import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.NavigationView;
-import android.support.design.widget.Snackbar;
 import android.support.v4.content.ContextCompat;
-import android.support.v4.view.GravityCompat;
-import android.support.v4.widget.DrawerLayout;
-import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -30,76 +22,73 @@ import com.codemybrainsout.ratingdialog.RatingDialog;
 import com.google.android.gms.appinvite.AppInvite;
 import com.google.android.gms.appinvite.AppInviteInvitation;
 import com.google.android.gms.appinvite.AppInviteInvitationResult;
-import com.google.android.gms.appinvite.AppInviteReferral;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
 import com.orhanobut.logger.Logger;
-import com.sand5.privacyscreen.PrivacyScreenApplication;
 import com.sand5.privacyscreen.R;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
 
-// TODO: 5/7/17 Firebase invites
+// TODO: 5/7/17 Fire base invites (we do not have coupon codes to share)
 
 public class PrivacyScreenActivity extends AppCompatActivity
-        implements NavigationView.OnNavigationItemSelectedListener, GoogleApiClient.OnConnectionFailedListener {
+        implements GoogleApiClient.OnConnectionFailedListener {
 
     private static final int REQUEST_INVITE = 101;
     final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome";
     final String websiteURL = "https://goo.gl/forms/tBenYOnLLMQg39nn1";
+
     @BindView(R.id.imageview_activity_privacyScreen)
-    ImageView privacyScreenBackgroundImageview;
+    ImageView privacyScreenBackgroundImageView;
+
     @BindView(R.id.button_start_shade)
     Button buttonStartShade;
+
     @BindView(R.id.button_customize_shade)
     Button buttonCustomizeShade;
+
     @BindView(R.id.button_settings_shade)
     Button buttonSettingsShade;
+
     @BindView(R.id.button_feedback_shade)
     Button buttonFeedbackShade;
+
     @BindView(R.id.button_share_shade)
     Button buttonShareShade;
+
     @BindView(R.id.fab)
     FloatingActionButton startShadeFab;
+
     CustomTabsClient mCustomTabsClient;
     CustomTabsSession mCustomTabsSession;
     CustomTabsServiceConnection mCustomTabsServiceConnection;
     CustomTabsIntent mCustomTabsIntent;
-    private SharedPreferences preferences;
-    private GoogleApiClient mGoogleApiClient;
+
+    GoogleApiClient mGoogleApiClient;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_privacy_screen);
         ButterKnife.bind(this);
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        Toolbar toolbar = (Toolbar) findViewById(R.id.activity_privacyScreen_toolbar);
         setSupportActionBar(toolbar);
+        //noinspection ConstantConditions
+        getSupportActionBar().setTitle("");
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
+                startPrivacyShade();
             }
         });
 
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
-        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
-                this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
-        drawer.setDrawerListener(toggle);
-        toggle.syncState();
-
-        NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
-        navigationView.setNavigationItemSelectedListener(this);
-        preferences = PrivacyScreenApplication.getInstance().getSharedPreferences();
-        //showRatingDialog();
+        showRatingDialog();
         createGoogleAPIClient();
-
     }
 
     private void createGoogleAPIClient() {
@@ -111,18 +100,18 @@ public class PrivacyScreenActivity extends AppCompatActivity
         // Check for App Invite invitations and launch deep-link activity if possible.
         // Requires that an Activity is registered in AndroidManifest.xml to handle
         // deep-link URLs.
-        boolean autoLaunchDeepLink = true;
-        AppInvite.AppInviteApi.getInvitation(mGoogleApiClient, this, autoLaunchDeepLink)
+        //boolean autoLaunchDeepLink = true;
+        AppInvite.AppInviteApi.getInvitation(mGoogleApiClient, this, true)
                 .setResultCallback(
                         new ResultCallback<AppInviteInvitationResult>() {
                             @Override
-                            public void onResult(AppInviteInvitationResult result) {
+                            public void onResult(@NonNull AppInviteInvitationResult result) {
                                 Logger.d("getInvitation:onResult:" + result.getStatus());
                                 if (result.getStatus().isSuccess()) {
                                     // Extract information from the intent
-                                    Intent intent = result.getInvitationIntent();
-                                    String deepLink = AppInviteReferral.getDeepLink(intent);
-                                    String invitationId = AppInviteReferral.getInvitationId(intent);
+                                    //Intent intent = result.getInvitationIntent();
+                                    //String deepLink = AppInviteReferral.getDeepLink(intent);
+                                    //String invitationId = AppInviteReferral.getInvitationId(intent);
 
                                     // Because autoLaunchDeepLink = true we don't have to do anything
                                     // here, but we could set that to false and manually choose
@@ -133,62 +122,7 @@ public class PrivacyScreenActivity extends AppCompatActivity
                         });
     }
 
-    @Override
-    public void onBackPressed() {
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
-        if (drawer.isDrawerOpen(GravityCompat.START)) {
-            drawer.closeDrawer(GravityCompat.START);
-        } else {
-            super.onBackPressed();
-        }
-    }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.privacy_screen, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
-    }
-
-    @SuppressWarnings("StatementWithEmptyBody")
-    @Override
-    public boolean onNavigationItemSelected(MenuItem item) {
-        // Handle navigation view item clicks here.
-        int id = item.getItemId();
-
-        if (id == R.id.nav_camera) {
-            // Handle the camera action
-        } else if (id == R.id.nav_gallery) {
-
-        } else if (id == R.id.nav_slideshow) {
-
-        } else if (id == R.id.nav_manage) {
-
-        } else if (id == R.id.nav_share) {
-
-        } else if (id == R.id.nav_send) {
-
-        }
-
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
-        drawer.closeDrawer(GravityCompat.START);
-        return true;
-    }
 
     @OnClick({R.id.button_start_shade, R.id.button_customize_shade, R.id.button_settings_shade, R.id.button_feedback_shade, R.id.button_share_shade, R.id.fab})
     public void onViewClicked(View view) {
@@ -291,6 +225,7 @@ public class PrivacyScreenActivity extends AppCompatActivity
     private void showRatingDialog() {
         final RatingDialog ratingDialog = new RatingDialog.Builder(this)
                 .threshold(3)
+                .session(3)
                 .onRatingBarFormSumbit(new RatingDialog.Builder.RatingDialogFormListener() {
                     @Override
                     public void onFormSubmitted(String feedback) {

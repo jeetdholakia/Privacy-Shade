@@ -16,37 +16,78 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="8dp"
         android:orientation="vertical">
 
         <Button
             android:id="@+id/button_start_shade"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/start_privacy_shade" />
+            android:drawableStart="@drawable/ic_security_white_24dp"
+            android:gravity="center"
+            android:paddingBottom="8dp"
+            android:paddingTop="8dp"
+            android:text="@string/start_privacy_shade"
+            android:textColor="@color/grey_400" />
 
-        <Button
-            android:id="@+id/button_customize_shade"
-            android:layout_width="wrap_content"
+        <GridLayout
+            android:id="@+id/GridLayout1"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/customize" />
+            android:columnCount="2"
+            android:orientation="vertical"
+            android:paddingTop="8dp"
+            android:rowCount="2">
 
-        <Button
-            android:id="@+id/button_settings_shade"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/settings" />
+            <Button
+                android:id="@+id/button_customize_shade"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_column="0"
+                android:layout_columnWeight="1"
+                android:layout_row="0"
+                android:layout_rowWeight="1"
+                android:drawableStart="@drawable/ic_format_paint_white_24dp"
+                android:text="@string/customize"
+                android:textColor="@color/grey_400" />
 
-        <Button
-            android:id="@+id/button_feedback_shade"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/send_feedback" />
+            <Button
+                android:id="@+id/button_settings_shade"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_column="1"
+                android:layout_columnWeight="1"
+                android:layout_row="0"
+                android:layout_rowWeight="1"
+                android:drawableStart="@drawable/ic_settings_white_24dp"
+                android:text="@string/settings"
+                android:textColor="@color/grey_400" />
 
-        <Button
-            android:id="@+id/button_share_shade"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/share_app" />
+            <Button
+                android:id="@+id/button_feedback_shade"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_column="0"
+                android:layout_columnWeight="1"
+                android:layout_row="1"
+                android:layout_rowWeight="1"
+                android:drawableStart="@drawable/ic_feedback_white_24dp"
+                android:text="@string/send_feedback"
+                android:textColor="@color/grey_400" />
+
+            <Button
+                android:id="@+id/button_share_shade"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_column="1"
+                android:layout_columnWeight="1"
+                android:layout_row="1"
+                android:layout_rowWeight="1"
+                android:drawableStart="@drawable/ic_share_white_24dp"
+                android:text="@string/share_app"
+                android:textColor="@color/grey_400" />
+        </GridLayout>
 
     </LinearLayout>
 

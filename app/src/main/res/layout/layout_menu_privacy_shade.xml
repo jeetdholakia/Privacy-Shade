@@ -235,7 +235,6 @@
             android:layout_gravity="end"
             android:paddingEnd="16dp"
             android:paddingStart="16dp"
-            android:visibility="gone"
             app:rv_centered="true"
             app:rv_rippleDuration="400">
 
@@ -258,11 +257,9 @@
                     android:textColor="@color/white" />
 
                 <ImageButton
-
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="@android:color/transparent"
-                    android:src="@drawable/ic_share_white_24dp" />
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:background="@drawable/share" />
             </LinearLayout>
         </com.andexert.library.RippleView>
 

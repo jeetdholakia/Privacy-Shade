@@ -87,29 +87,26 @@ import static com.sand5.privacyscreen.utils.DisplayUtils.pxToDp;
 public class PrivacyShadeService extends Service {
 
     // TODO: 5/6/17 Fix sporadic touches
-    // TODO: 5/6/17 Move everything to settings/ new activity
     // TODO: 4/17/17 Walk-through
     // TODO: 5/3/17 Custom imageView with canvas
     // TODO: 4/22/17 Vinyl Store IAP
     // TODO: 4/24/17 Make menu movable
-    // TODO: 4/26/17 Add Fire Base invites
     // TODO: 5/2/17 Add color/vinyl/wallpaper selector
     // TODO: 5/3/17 Auto night-mode
     // TODO: 5/3/17 Check network settings in vinyl activity
     // TODO: 5/3/17 Load bitmap asynchronously
-    // TODO: 5/3/17 Ratings Activity
-    // TODO: 5/3/17 Find new Vinyls
     // TODO: 5/6/17 Generate vinyl thumbnails
 
     /**
      * Focus on the upcoming version -> Ease of use
-     * Removing lag on circle
-     * Handling touches better
-     * Fixing crashes
-     * Widget to switch on/off
-     * Chat head to switch on/off
-     * Auto hide feature
+     * Handling touches better (TEST)
+     * Widget to switch on/off (iap) (DONE)
+     * Auto hide feature like bb privacy shade (iap)
+     * Tile based on/off (iap)
      * Explore other privacy holes and usages in phone usage (notifications,etc.)
+     * Explore how the screen can help in top 10 used apps
+     * Open/Close per app (iap)
+     * Emergency Placeholder shades (iap)
      */
 
     public static boolean isRunning = false;
@@ -617,7 +614,7 @@ public class PrivacyShadeService extends Service {
         transparentPaint.setColor(Color.TRANSPARENT);
         transparentPaint.setAntiAlias(true);
 
-        backgroundType = preferences.getString("background_type", "color");
+        backgroundType = "color"; //preferences.getString("background_type", "color");
 
         if (backgroundType.equals("color")) {
             Logger.d("Background type is color");
@@ -648,7 +645,7 @@ public class PrivacyShadeService extends Service {
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, // | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,//| WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
                 PixelFormat.TRANSLUCENT);
         privacyShadeParams.gravity = Gravity.TOP | Gravity.START;
         privacyShadeParams.alpha = getDefaultOpacity();
@@ -686,7 +683,7 @@ public class PrivacyShadeService extends Service {
                 WindowManager.LayoutParams.MATCH_PARENT,
                 defaultRectangleBorderWidth * 3,
                 WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,// | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE ,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT);
         bottomLineParams.gravity = Gravity.TOP | Gravity.START;
         bottomLineParams.x = 0;
@@ -705,7 +702,7 @@ public class PrivacyShadeService extends Service {
                 WindowManager.LayoutParams.MATCH_PARENT,
                 defaultRectangleBorderWidth * 3,
                 WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT);
         topLineParams.gravity = Gravity.TOP | Gravity.START;
         topLineParams.x = 0;
@@ -769,7 +766,7 @@ public class PrivacyShadeService extends Service {
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, //| WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT);
         menuParams.gravity = Gravity.TOP | Gravity.END;
         menuParams.y = getStatusBarHeight(getApplicationContext()) * 2;

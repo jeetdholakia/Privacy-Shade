@@ -35,6 +35,7 @@ public class VinylAdapter extends RecyclerView.Adapter<VinylAdapter.VinylViewHol
     private ArrayList<String> urlList;
     private FirebaseStorage firebaseStorage;
 
+
     public VinylAdapter(Context context, ArrayList<String> urlList, FirebaseStorage firebaseStorage) {
         this.context = context;
         this.urlList = urlList;

@@ -2,14 +2,12 @@
 
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-        <!-- Customize your theme here. -->
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
     </style>
 
     <style name="DarkAppTheme" parent="AppTheme">
-        <!-- Customize your theme here. -->
         <item name="colorPrimary">@color/vinyl_primary</item>
         <item name="colorPrimaryDark">@color/vinyl_primary_dark</item>
         <item name="colorAccent">@color/vinyl_accent</item>
@@ -18,6 +16,9 @@
         <item name="android:dividerHorizontal">@color/vinyl_divider</item>
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
+        <item name="colorButtonNormal">@color/grey_900</item>
+        <item name="android:windowBackground">@color/grey_800</item>
+        <item name="colorControlHighlight">@color/grey_700</item>
     </style>
 
     <style name="Theme.AppCompat.Translucent" parent="Theme.AppCompat.NoActionBar">

@@ -1,11 +1,14 @@
 package com.sand5.privacyscreen.services;
 
+import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.Context;
+import android.content.Intent;
 import android.widget.RemoteViews;
 
 import com.sand5.privacyscreen.R;
+import com.sand5.privacyscreen.activities.MainActivity;
 
 /**
  * Implementation of App Widget functionality.
@@ -14,11 +17,16 @@ public class PrivacyShadeWidgetProvider extends AppWidgetProvider {
 
     static void updateAppWidget(Context context, AppWidgetManager appWidgetManager,
                                 int appWidgetId) {
-
-        CharSequence widgetText = context.getString(R.string.appwidget_text);
         // Construct the RemoteViews object
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.privacy_shade_widget);
-        views.setTextViewText(R.id.appwidget_icon, widgetText);
+        //views.setImageViewResource(R.drawable.ic_security_white_24dp,R.drawable.ic_security_white_24dp);
+
+
+        Intent intent = new Intent(context, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        PendingIntent pending = PendingIntent.getActivity(context, 0, intent, 0);
+
+        views.setOnClickPendingIntent(R.id.appwidget_icon, pending);
 
         // Instruct the widget manager to update the widget
         appWidgetManager.updateAppWidget(appWidgetId, views);
